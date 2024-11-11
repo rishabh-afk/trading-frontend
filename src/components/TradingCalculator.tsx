@@ -22,7 +22,7 @@ export default function HomeComponent() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const resp = await axios.post("http://localhost:5000/api/trading/get-action", formData);
+            const resp = await axios.post("http://localhost:8000/api/trading/get-action", formData);
             const { message, success } = resp?.data;
             if (success) toast.info(message);
         } catch (error) {
