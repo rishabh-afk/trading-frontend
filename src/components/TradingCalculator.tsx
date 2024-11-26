@@ -25,7 +25,7 @@ export default function HomeComponent() {
     e.preventDefault();
     try {
       const resp = await axios.post(
-        "http://localhost:3000/api/trading/get-action",
+        "https://trading-frontend-roan.vercel.app/api/trading/get-action",
         formData
       );
       const { message, data, success } = resp?.data;
@@ -42,7 +42,7 @@ export default function HomeComponent() {
   const buy = async (formData: any) => {
     try {
       const resp = await axios.post(
-        "http://localhost:3000/api/trading/get-action",
+        "https://trading-frontend-roan.vercel.app/api/trading/get-action",
         formData
       );
       const { message, data, success } = resp?.data;
@@ -59,7 +59,7 @@ export default function HomeComponent() {
   const makeApiCall = async () => {
     try {
       const resp = await axios.post(
-        "http://localhost:3000/api/trading/redirect"
+        "https://trading-frontend-roan.vercel.app/api/trading/redirect"
       );
       const { ohlc } = resp?.data;
       console.log(ohlc);
