@@ -58,8 +58,8 @@ export default function HomeComponent() {
 
   const makeApiCall = async () => {
     try {
-      const resp = await axios.get(
-        "http://localhost:3000/api/trading/fetch-data"
+      const resp = await axios.post(
+        "http://localhost:3000/api/trading/redirect"
       );
       const { ohlc } = resp?.data;
       console.log(ohlc);
@@ -132,11 +132,23 @@ export default function HomeComponent() {
     };
   }, []);
 
+  const handleLogin = () => {
+    window.location.href = "/api/trading/login";
+  };
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-gray-800 to-gray-900 px-4">
-      <h1 className="text-4xl font-bold text-white mb-8 animate-fadeIn">
-        Trading Prediction
-      </h1>
+      <div className="flex justify-center items-center mb-10 gap-10">
+        <h1 className="text-4xl font-bold text-white animate-fadeIn">
+          Trading Prediction
+        </h1>
+        <button
+          onClick={handleLogin}
+          className="bg-blue-500 text-white text-lg rounded px-4 py-2"
+        >
+          Login
+        </button>
+      </div>
       <div className="flex justify-between gap-5 items-center">
         <CalculatedPoints points={points} />
         <form
