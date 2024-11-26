@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { strings } from "@/data/messages";
 
+// CustomError class for handling custom error messages
 class CustomError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -9,7 +10,17 @@ class CustomError extends Error {
   }
 }
 
-export class TradingService {
+// ApiResponse class for structuring the API response
+class ApiResponse {
+  constructor(
+    public success: boolean,
+    public data: object,
+    public message: string
+  ) {}
+}
+
+// TradingService class with static methods (should not be exported as part of the route)
+class TradingService {
   static async CalculatePoints(
     high: number,
     low: number,
@@ -66,14 +77,7 @@ export class TradingService {
   }
 }
 
-class ApiResponse {
-  constructor(
-    public success: boolean,
-    public data: object,
-    public message: string
-  ) {}
-}
-
+// Route handler function (exported as part of the Next.js route)
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const { high, low, close, currentPrice } = await request.json();
@@ -91,7 +95,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Calculate the trading points
+    // Calculate the trading points using TradingService
     const points: any = await TradingService.CalculatePoints(high, low, close);
 
     // Determine action based on the current price
