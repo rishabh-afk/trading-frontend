@@ -3,8 +3,10 @@ import axios from "axios";
 import { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import CalculatedPoints from "./CalculatedPoints";
 
 export default function HomeComponent() {
+  const [points, setPoints] = useState<any>({});
   const [formData, setFormData] = useState({
     high: 21801.45, // Example high value
     low: 16828.35, // Example low value
@@ -26,8 +28,11 @@ export default function HomeComponent() {
         "http://localhost:3000/api/trading/get-action",
         formData
       );
-      const { message, success } = resp?.data;
-      if (success) toast.info(message);
+      const { message, data, success } = resp?.data;
+      if (success) {
+        setPoints(data);
+        toast.info(message);
+      }
     } catch (error) {
       console.error("ERROR:", error);
       toast.error("An error occurred while processing your request.");
@@ -40,8 +45,11 @@ export default function HomeComponent() {
         "http://localhost:3000/api/trading/get-action",
         formData
       );
-      const { message, success } = resp?.data;
-      if (success) toast.info(message);
+      const { message, data, success } = resp?.data;
+      if (success) {
+        setPoints(data);
+        toast.info(message);
+      }
     } catch (error) {
       console.error("ERROR:", error);
       toast.error("An error occurred while processing your request.");
@@ -55,10 +63,10 @@ export default function HomeComponent() {
       );
       const { ohlc } = resp?.data;
       console.log(ohlc);
-      const lastPrice = ohlc["NSE:RELIANCE"].last_price;
-      const highPrice = ohlc["NSE:RELIANCE"].ohlc.high;
-      const lowPrice = ohlc["NSE:RELIANCE"].ohlc.low;
-      const closePrice = ohlc["NSE:RELIANCE"].ohlc.close;
+      const lastPrice = ohlc["NSE:NIFTY BANK"].last_price;
+      const highPrice = ohlc["NSE:NIFTY BANK"].ohlc.high;
+      const lowPrice = ohlc["NSE:NIFTY BANK"].ohlc.low;
+      const closePrice = ohlc["NSE:NIFTY BANK"].ohlc.close;
 
       setFormData({
         high: highPrice,
@@ -90,7 +98,7 @@ export default function HomeComponent() {
     let intervalId: NodeJS.Timeout; // Move intervalId declaration here to access in the cleanup
 
     if (now > startTime && now < endTime) {
-      const intervalTime = 3 * 60 * 1000; // 3 minutes in milliseconds
+      const intervalTime = 1 * 60 * 1000; // 3 minutes in milliseconds
       let currentTime = new Date();
 
       // If it's already past 9:15, calculate the first interval start time
@@ -129,76 +137,78 @@ export default function HomeComponent() {
       <h1 className="text-4xl font-bold text-white mb-8 animate-fadeIn">
         Trading Prediction
       </h1>
-
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white p-4 rounded-lg shadow-lg w-full max-w-lg animate-fadeIn"
-      >
-        <div className="grid grid-cols-1 gap-3">
-          <div>
-            <label className="block text-lg font-semibold text-gray-700 mb-1">
-              High
-            </label>
-            <input
-              type="number"
-              name="high"
-              value={formData.high}
-              onChange={handleChange}
-              className="mt-1 p-3 border border-gray-300 w-full rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-lg font-semibold text-gray-700 mb-1">
-              Low
-            </label>
-            <input
-              type="number"
-              name="low"
-              value={formData.low}
-              onChange={handleChange}
-              className="mt-1 p-3 border border-gray-300 w-full rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-lg font-semibold text-gray-700 mb-1">
-              Close
-            </label>
-            <input
-              type="number"
-              name="close"
-              value={formData.close}
-              onChange={handleChange}
-              className="mt-1 p-3 border border-gray-300 w-full rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-lg font-semibold text-gray-700 mb-1">
-              Current Price
-            </label>
-            <input
-              type="number"
-              name="currentPrice"
-              value={formData.currentPrice}
-              onChange={handleChange}
-              className="mt-1 p-3 border border-gray-300 w-full rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-          </div>
-        </div>
-
-        <button
-          type="submit"
-          className="w-full mt-6 bg-blue-600 text-white py-3 rounded-lg font-semibold shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-300 ease-in-out"
+      <div className="flex justify-between gap-5 items-center">
+        <CalculatedPoints points={points} />
+        <form
+          onSubmit={handleSubmit}
+          className="bg-white p-4 rounded-lg shadow-lg w-1/2 animate-fadeIn"
         >
-          Predict
-        </button>
-      </form>
+          <div className="grid grid-cols-1 gap-3">
+            <div>
+              <label className="block text-lg font-semibold text-gray-700 mb-1">
+                High
+              </label>
+              <input
+                type="number"
+                name="high"
+                value={formData.high}
+                onChange={handleChange}
+                className="mt-1 p-3 border border-gray-300 w-full rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-lg font-semibold text-gray-700 mb-1">
+                Low
+              </label>
+              <input
+                type="number"
+                name="low"
+                value={formData.low}
+                onChange={handleChange}
+                className="mt-1 p-3 border border-gray-300 w-full rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-lg font-semibold text-gray-700 mb-1">
+                Close
+              </label>
+              <input
+                type="number"
+                name="close"
+                value={formData.close}
+                onChange={handleChange}
+                className="mt-1 p-3 border border-gray-300 w-full rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-lg font-semibold text-gray-700 mb-1">
+                Current Price
+              </label>
+              <input
+                type="number"
+                name="currentPrice"
+                value={formData.currentPrice}
+                onChange={handleChange}
+                className="mt-1 p-3 border border-gray-300 w-full rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+          </div>
+
+          {/* <button
+            type="submit"
+            className="w-full mt-6 bg-blue-600 text-white py-3 rounded-lg font-semibold shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-300 ease-in-out"
+          >
+            Predict
+          </button> */}
+        </form>
+      </div>
     </div>
   );
 }
