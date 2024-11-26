@@ -54,7 +54,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         { status: 500 }
       );
     }
-    const url = process.env.FRONTEND_URL;
+    const url = "https://trading-frontend-roan.vercel.app";
     return NextResponse.redirect(url ?? "http://localhost:3001");
   } catch (error) {
     console.error("Error handling redirection:", (error as Error).message);
