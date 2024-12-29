@@ -72,28 +72,28 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
-    // if (!accessToken) {
-    //   const loginUrl = kite.getLoginURL();
-    //   if (!loginUrl) {
-    //     return NextResponse.json(
-    //       { error: "Failed to generate login URL." },
-    //       { status: 500 }
-    //     );
-    //   }
-    //   return NextResponse.redirect(loginUrl);
-    // }
+    if (!accessToken) {
+      const loginUrl = kite.getLoginURL();
+      if (!loginUrl) {
+        return NextResponse.json(
+          { error: "Failed to generate login URL." },
+          { status: 500 }
+        );
+      }
+      return NextResponse.redirect(loginUrl);
+    }
 
     // Set the stored access token for KiteConnect
-    // kite.setAccessToken(accessToken);
+    kite.setAccessToken(accessToken);
 
     // Parse instruments from request body
     // const instrumentslist = await kite.getInstruments();
     // console.log(instrumentslist.slice(0, 10));
-    // const instruments = ["NSE:NIFTY BANK"];
+    const instruments = ["NSE:NIFTY BANK"];
 
     // Fetch data using KiteConnect
-    // const ohlc = await kite.getOHLC(instruments);
-    const ohlc = {};
+    const ohlc = await kite.getOHLC(instruments);
+
     return NextResponse.json({ ohlc }, { status: 200 });
   } catch (error) {
     console.error("Error fetching data:", error as Error);
