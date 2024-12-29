@@ -5,13 +5,16 @@ import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import CalculatedPoints from "./CalculatedPoints";
 
+const BASEURL =
+  process.env.NEXT_PUBLIC_API_URL ?? "https://trading-frontend-roan.vercel.app";
+
 export default function HomeComponent() {
   const [points, setPoints] = useState<any>({});
   const [formData, setFormData] = useState({
-    high: 21801.45, // Example high value
-    low: 16828.35, // Example low value
-    close: 21731.4, // Example close value
-    currentPrice: 22000, // Current price for determining action
+    high: 25000.0, // Example high value
+    low: 24000.0, // Example low value
+    close: 24583.33, // Example close value
+    currentPrice: 24250, // Current price for determining action
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -25,7 +28,7 @@ export default function HomeComponent() {
     e.preventDefault();
     try {
       const resp = await axios.post(
-        "https://trading-frontend-roan.vercel.app/api/trading/get-action",
+        `${BASEURL}/api/trading/get-action`,
         formData
       );
       const { message, data, success } = resp?.data;
@@ -34,7 +37,6 @@ export default function HomeComponent() {
         toast.info(message);
       }
     } catch (error) {
-      console.error("ERROR:", error);
       toast.error("An error occurred while processing your request.");
     }
   };
@@ -42,7 +44,7 @@ export default function HomeComponent() {
   const buy = async (formData: any) => {
     try {
       const resp = await axios.post(
-        "https://trading-frontend-roan.vercel.app/api/trading/get-action",
+        `${BASEURL}/api/trading/get-action`,
         formData
       );
       const { message, data, success } = resp?.data;
@@ -51,22 +53,19 @@ export default function HomeComponent() {
         toast.info(message);
       }
     } catch (error) {
-      console.error("ERROR:", error);
       toast.error("An error occurred while processing your request.");
     }
   };
 
   const makeApiCall = async () => {
     try {
-      const resp = await axios.post(
-        "https://trading-frontend-roan.vercel.app/api/trading/redirect"
-      );
+      const resp = await axios.post(`${BASEURL}/api/trading/redirect`);
       const { ohlc } = resp?.data;
-      console.log(ohlc);
-      const lastPrice = ohlc["NSE:NIFTY BANK"].last_price;
-      const highPrice = ohlc["NSE:NIFTY BANK"].ohlc.high;
-      const lowPrice = ohlc["NSE:NIFTY BANK"].ohlc.low;
-      const closePrice = ohlc["NSE:NIFTY BANK"].ohlc.close;
+      const lastPrice =
+        formData?.currentPrice ?? ohlc["NSE:NIFTY BANK"].last_price;
+      const highPrice = formData?.high ?? ohlc["NSE:NIFTY BANK"].ohlc.high;
+      const lowPrice = formData?.low ?? ohlc["NSE:NIFTY BANK"].ohlc.low;
+      const closePrice = formData?.close ?? ohlc["NSE:NIFTY BANK"].ohlc.close;
 
       setFormData({
         high: highPrice,
@@ -81,7 +80,6 @@ export default function HomeComponent() {
         currentPrice: lastPrice, // Update current price to the latest fetched value
       });
     } catch (error) {
-      console.error("ERROR:", error);
       toast.error("An error occurred while processing your request.");
     }
   };

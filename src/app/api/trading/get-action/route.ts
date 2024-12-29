@@ -55,24 +55,27 @@ class TradingService {
 
   static async DetermineAction(
     price: number,
+    close: number,
     tc: number,
     pivot: number,
     bc: number
   ): Promise<object> {
     console.log(
-      `Price: ${price}, TC: ${tc.toFixed(3)}, Pivot: ${pivot.toFixed(
-        3
-      )}, BC: ${bc.toFixed(3)}`
+      `Price: ${price}, 
+       Close: ${close}, 
+       TC: ${tc.toFixed(3)}, 
+       BC: ${bc.toFixed(3)},
+       Pivot: ${pivot.toFixed(3)}`
     );
     let message = "";
-    if (price > tc && price <= tc + 15) message = strings.CALL_BUY;
+    if (price <= tc && price < pivot) message = strings.SELL_OFF;
+    else if (price > tc && price <= tc + 15) message = strings.CALL_BUY;
     else if (price > tc + 15)
       message = "Price is above TC + 15. Consider taking action.";
     else if (price >= bc && price <= tc) message = strings.MONITORING;
     else if (price < bc && price <= bc - 15) message = strings.PUT_BUY;
     else if (price < bc - 15)
       message = "Price is below BC - 15. Consider taking action.";
-
     return { message: message };
   }
 }
@@ -101,6 +104,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Determine action based on the current price
     const resp: any = await TradingService.DetermineAction(
       currentPrice,
+      close,
       points.tc ?? 0,
       points.pivot ?? 0,
       points.bc ?? 0
