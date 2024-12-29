@@ -61,11 +61,10 @@ export default function HomeComponent() {
     try {
       const resp = await axios.post(`${BASEURL}/api/trading/redirect`);
       const { ohlc } = resp?.data;
-      const lastPrice =
-        formData?.currentPrice ?? ohlc["NSE:NIFTY BANK"].last_price;
-      const highPrice = formData?.high ?? ohlc["NSE:NIFTY BANK"].ohlc.high;
-      const lowPrice = formData?.low ?? ohlc["NSE:NIFTY BANK"].ohlc.low;
-      const closePrice = formData?.close ?? ohlc["NSE:NIFTY BANK"].ohlc.close;
+      const lastPrice = ohlc["NSE:NIFTY BANK"].last_price;
+      const highPrice = ohlc["NSE:NIFTY BANK"].ohlc.high;
+      const lowPrice = ohlc["NSE:NIFTY BANK"].ohlc.low;
+      const closePrice = ohlc["NSE:NIFTY BANK"].ohlc.close;
 
       setFormData({
         high: highPrice,
