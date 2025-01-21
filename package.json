@@ -10,7 +10,10 @@
   },
   "dependencies": {
     "axios": "^1.7.7",
+    "exceljs": "^4.4.0",
     "kiteconnect": "^5.0.1",
+    "mongodb": "^6.12.0",
+    "mongoose": "^8.9.4",
     "next": "15.0.1",
     "react": "19.0.0-rc-69d4b800-20241021",
     "react-dom": "19.0.0-rc-69d4b800-20241021",
@@ -25,7 +28,7 @@
     "eslint-config-next": "15.0.1",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5",
+    "typescript": "^5.7.3",
     "utf-8-validate": "^6.0.5"
   }
 }
