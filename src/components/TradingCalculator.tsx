@@ -23,6 +23,7 @@ const companies = [
   { label: "Nifty Bank", value: "NSE:NIFTY BANK" },
   { label: "State Bank of India", value: "NSE:SBIN" },
   { label: "Kotak Mahindra Bank", value: "NSE:KOTAKBANK" },
+  { label: "Sensex", value: "BSE:SENSEX" }, // Added Sensex
 ];
 export default function HomeComponent() {
   const [selectedCompany, setSelectedCompany] = useState(companies[0].value);
