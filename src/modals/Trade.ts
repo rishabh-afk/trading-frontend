@@ -23,6 +23,7 @@ interface ITrade extends Document {
   levels: Levels;
   entryTime: Date;
   company: string;
+  bufferValue: number;
   exitTime: Date | null;
   calculateLevels: () => Levels;
   generateSignal: () => string;
@@ -38,6 +39,7 @@ const TradeSchema = new Schema<ITrade>(
     exitTime: { type: Date, default: null },
     company: { type: String, required: true },
     entryTime: { type: Date, default: Date.now },
+    bufferValue: { type: Number, required: true },
     levels: {
       bc: { type: Number, default: 0 },
       tc: { type: Number, default: 0 },
@@ -76,11 +78,11 @@ TradeSchema.methods.calculateLevels = function (): Levels {
 };
 
 // Method to generate a signal
-TradeSchema.methods.generateSignal = function (): string {
+TradeSchema.methods.generateSignal = function (bufferValue: any): string {
   const { price, levels } = this;
   const { pivot, bc, tc, r1, r2, r3, r4, s1, s2, s3, s4 } = levels;
 
-  const BUFFER = 15; // Buffer value
+  const BUFFER = bufferValue ?? 15; // Buffer value
   let signal = "";
 
   if (price > r4) signal = "Price is above R4. Strong bullish signal.";

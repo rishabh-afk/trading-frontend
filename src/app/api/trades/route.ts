@@ -45,10 +45,14 @@ export async function POST(req: Request) {
     });
     const { high, low, close } = historicalData;
 
+    const bc = parseFloat(((high + low) / 2).toFixed(2));
+    const percentageValue = parseFloat((bc * 0.0006).toFixed(2));
+    const bufferValue = Math.round(percentageValue);
+
     // Create and save the trade
-    const trade = new Trade({ high, low, close, price, company });
+    const trade = new Trade({ high, low, close, price, company, bufferValue });
     trade.calculateLevels();
-    trade.generateSignal();
+    trade.generateSignal(bufferValue);
 
     await trade.save();
 

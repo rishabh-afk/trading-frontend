@@ -27,18 +27,22 @@ export async function GET(request) {
     }
 
     const today = new Date();
+
+    // Set start of the day for 9:15 AM IST
     const startOfDay = new Date(today);
-    startOfDay.setHours(3, 45, 0, 0); // 9:15 AM IST in UTC
+    startOfDay.setUTCHours(9 - 5, 15 - 30, 0, 0); // Adjust to UTC (IST - 5:30)
+
+    // Set end of the day for 3:30 PM IST
     const endOfDay = new Date(today);
-    endOfDay.setHours(10, 0, 0, 0); // 3:30 PM IST in UTC
+    endOfDay.setUTCHours(15 - 5, 30 - 30, 0, 0); // Adjust to UTC (IST - 5:30)
 
     // Find trades for the specified company within active market hours
     const trades = await Trade.find({
       company: company,
-      createdAt: {
-        $gte: startOfDay,
-        $lte: endOfDay,
-      },
+      // createdAt: {
+      //   $gte: startOfDay,
+      //   $lte: endOfDay,
+      // },
     });
 
     if (trades.length === 0) {
@@ -80,6 +84,7 @@ export async function GET(request) {
         "S2",
         "S3",
         "S4",
+        "Buffer",
       ])
       .eachCell((cell) => {
         cell.font = { bold: true };
@@ -97,6 +102,13 @@ export async function GET(request) {
         };
       });
 
+    const formatToIST = (date) => {
+      if (!date) return "N/A";
+      return new Date(date).toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata",
+      });
+    };
+
     // Add data rows
     trades.forEach((trade) => {
       worksheet.addRow([
@@ -106,8 +118,8 @@ export async function GET(request) {
         trade.close,
         trade.price,
         trade.signal,
-        trade.entryTime?.toISOString() || "N/A",
-        trade.exitTime?.toISOString() || "N/A",
+        formatToIST(trade.entryTime),
+        formatToIST(trade.exitTime),
         trade.levels.pivot,
         trade.levels.bc,
         trade.levels.tc,
@@ -119,6 +131,7 @@ export async function GET(request) {
         trade.levels.s2,
         trade.levels.s3,
         trade.levels.s4,
+        trade.bufferValue ?? "N/A",
       ]);
     });
 

@@ -1,10 +1,10 @@
 "use client";
 
 import axios from "axios";
-import { Suspense, useState } from "react";
 import Runtimer from "./Runtimer";
 import { toast } from "react-toastify";
 import LoginButton from "./LoginButton";
+import { Suspense, useState } from "react";
 import DownloadExcel from "./DownloadExcel";
 import "react-toastify/dist/ReactToastify.css";
 import CalculatedPoints from "./CalculatedPoints";
@@ -13,7 +13,6 @@ const BASEURL =
   process.env.NEXT_PUBLIC_API_URL || "https://trading-frontend-roan.vercel.app";
 
 const companies = [
-  { label: "Select Company", value: "" },
   { label: "TCS", value: "NSE:TCS" },
   { label: "Infosys", value: "NSE:INFY" },
   { label: "Nifty 50", value: "NSE:NIFTY 50" },
@@ -58,7 +57,7 @@ export default function HomeComponent() {
       toast.error(error?.response?.data?.message || "Failed to execute trade.");
     }
   };
-  const makeApiCall = async () => {
+  const makeApiCall = async (selectedCompany: any) => {
     try {
       if (!selectedCompany) {
         return toast.warn("Please select a company!");
@@ -100,7 +99,7 @@ export default function HomeComponent() {
         <Suspense fallback={<div>Loading...</div>}>
           <LoginButton />
         </Suspense>
-        <Runtimer makeApiCall={makeApiCall} />
+        <Runtimer selectedCompany={selectedCompany} makeApiCall={makeApiCall} />
         <DownloadExcel selectedCompany={selectedCompany} />
       </div>
       <div className="bg-gray-700 rounded-lg p-6 shadow-lg text-white max-w-md w-full">
@@ -121,7 +120,7 @@ export default function HomeComponent() {
           </select>
         </div>
         <button
-          onClick={makeApiCall}
+          onClick={() => makeApiCall(selectedCompany)}
           className="mt-2 w-full py-2 px-4 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-md shadow-md transition duration-200"
         >
           Fetch & Execute Trade
