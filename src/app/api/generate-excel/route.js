@@ -39,10 +39,10 @@ export async function GET(request) {
     // Find trades for the specified company within active market hours
     const trades = await Trade.find({
       company: company,
-      // createdAt: {
-      //   $gte: startOfDay,
-      //   $lte: endOfDay,
-      // },
+      createdAt: {
+        $gte: startOfDay,
+        $lte: endOfDay,
+      },
     });
 
     if (trades.length === 0) {
