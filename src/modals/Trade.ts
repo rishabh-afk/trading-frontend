@@ -21,10 +21,11 @@ interface ITrade extends Document {
   price: number;
   signal: string;
   levels: Levels;
+  exitTime: Date;
   entryTime: Date;
   company: string;
+  createdAt?: Date;
   bufferValue: number;
-  exitTime: Date | null;
   calculateLevels: () => Levels;
   generateSignal: () => string;
 }
@@ -37,8 +38,8 @@ const TradeSchema = new Schema<ITrade>(
     close: { type: Number, required: true },
     price: { type: Number, required: true },
     exitTime: { type: Date, default: null },
+    entryTime: { type: Date, default: null },
     company: { type: String, required: true },
-    entryTime: { type: Date, default: Date.now },
     bufferValue: { type: Number, required: true },
     levels: {
       bc: { type: Number, default: 0 },
@@ -56,6 +57,14 @@ const TradeSchema = new Schema<ITrade>(
   },
   { timestamps: true }
 );
+
+// Pre-save hook to set entryTime and adjust exitTime
+TradeSchema.pre("save", function (next) {
+  const createdAt = this.createdAt || new Date();
+  this.entryTime = new Date(createdAt);
+  this.exitTime = new Date(createdAt.getTime() + 3 * 60 * 1000);
+  next();
+});
 
 // Method to calculate levels
 TradeSchema.methods.calculateLevels = function (): Levels {

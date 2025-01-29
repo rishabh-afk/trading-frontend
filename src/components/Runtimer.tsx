@@ -1,60 +1,74 @@
 import { toast } from "react-toastify";
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 
 const Runtimer = ({
   makeApiCall,
   selectedCompany,
 }: {
-  makeApiCall: any;
+  makeApiCall: (company: any) => void;
   selectedCompany: any;
 }) => {
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
-    const startTime = new Date();
-    startTime.setHours(9, 15, 0, 0); // Set to 9:15 AM
-
-    const endTime = new Date();
-    endTime.setHours(23, 30, 0, 0); // Set to 3:30 PM
-
-    const now = new Date();
-
-    let intervalId: NodeJS.Timeout; // Move intervalId declaration here to access in the cleanup
-
-    if (now > startTime && now < endTime) {
-      const intervalTime = 3 * 60 * 1000; // 3 minutes in milliseconds
-      let currentTime = new Date();
-
-      // If it's already past 9:15, calculate the first interval start time
-      let firstIntervalTime = startTime.getTime() - currentTime.getTime();
-      if (firstIntervalTime < 0) {
-        firstIntervalTime = 0;
-      }
-
-      // Start making API calls after 9:15 AM
-      intervalId = setInterval(() => {
-        // Check if it's past 3:30 PM, stop the interval if it is
-        if (new Date() > endTime) {
-          clearInterval(intervalId);
-          toast.info("End of trading session at 3:30 PM");
-          return;
-        }
-        makeApiCall(selectedCompany); // Make the API call
-      }, intervalTime);
-
-      // Initial delay until 9:15 AM
-      setTimeout(
-        () => {
-          makeApiCall(selectedCompany); // Make the first API call
-        },
-        firstIntervalTime,
-        selectedCompany
+    const getISTTime = () => {
+      const now = new Date();
+      return new Date(
+        now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" })
       );
-    } else {
-      toast.info("Trading session starts at 9:15 AM");
+    };
+
+    const startTime = getISTTime();
+    startTime.setHours(9, 15, 0, 0); // 9:15 AM IST
+
+    const endTime = getISTTime();
+    endTime.setHours(15, 30, 0, 0); // 3:30 PM IST
+
+    const now = getISTTime();
+
+    if (now < startTime) {
+      toast.info("Trading session starts at 9:15 AM IST");
+      return;
     }
 
-    // Cleanup function to clear the interval on component unmount
+    if (now > endTime) {
+      toast.info("Trading session ended at 3:30 PM IST");
+      return;
+    }
+
+    const getNextInterval = () => {
+      const currentTime = getISTTime();
+      const minutes = currentTime.getMinutes();
+      const remainder = minutes % 3;
+      const nextRunMinutes =
+        remainder === 0 ? minutes : minutes + (3 - remainder);
+
+      currentTime.setMinutes(nextRunMinutes, 0, 0);
+      return currentTime;
+    };
+
+    const scheduleApiCalls = () => {
+      const nextInterval = getNextInterval();
+      const delay = nextInterval.getTime() - getISTTime().getTime();
+
+      setTimeout(() => {
+        makeApiCall(selectedCompany);
+        intervalRef.current = setInterval(() => {
+          const nowIST = getISTTime();
+          if (nowIST > endTime) {
+            clearInterval(intervalRef.current!);
+            toast.info("End of trading session at 3:30 PM IST");
+            return;
+          }
+          makeApiCall(selectedCompany);
+        }, 3 * 60 * 1000); // Every 3 minutes
+      }, delay);
+    };
+
+    scheduleApiCalls();
+
     return () => {
-      clearInterval(intervalId);
+      if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, [selectedCompany]);
 
