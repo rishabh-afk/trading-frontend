@@ -9,32 +9,103 @@ interface HistoricalData {
   close: number;
 }
 
-interface OhlcResponse {
-  high: number;
-  low: number;
-  close: number;
-  currentPrice: number;
-  levels: {
-    pivot: number;
-    bc: number;
-    tc: number;
-    r1: number;
-    r2: number;
-    r3: number;
-    r4: number;
-    s1: number;
-    s2: number;
-    s3: number;
-    s4: number;
-  };
-}
-
 // Kite SDK instance
 const kite = new KiteConnect({
   api_key: process.env.KITE_API_KEY || "",
 });
 
 let accessToken: string | null = null;
+
+/**
+ * Fetches historical OHLC data for the given company for at least 14 periods.
+ */
+async function getHistoricalDataFunc(
+  instrumentToken: number,
+  startDate: string,
+  endDate: string,
+  period: number = 14
+): Promise<HistoricalData[]> {
+  try {
+    const historicalData: any = await kite.getHistoricalData(
+      instrumentToken,
+      "3minute",
+      startDate,
+      endDate
+    );
+
+    if (!historicalData || historicalData.length < period) {
+      throw new Error(
+        "Insufficient historical data for Supertrend calculation."
+      );
+    }
+
+    // Extract relevant OHLC data
+    const formattedData: HistoricalData[] = historicalData.map((data: any) => ({
+      low: data.low,
+      high: data.high,
+      close: data.close,
+    }));
+
+    return formattedData;
+  } catch (error) {
+    console.error("Error fetching historical data:", error);
+    return [];
+  }
+}
+
+/**
+ * Calculates the Supertrend indicator based on historical OHLC data.
+ */
+function calculateSupertrend(
+  ohlcData: HistoricalData[],
+  period: number = 10,
+  multiplier: number = 3
+) {
+  if (ohlcData.length === 0) {
+    throw new Error("Insufficient historical data for Supertrend calculation.");
+  }
+
+  let atr: number[] = [];
+  let upperBand: number[] = [];
+  let lowerBand: number[] = [];
+  let supertrend: ("bullish" | "bearish")[] = [];
+
+  // Calculate ATR (Average True Range)
+  for (let i = 1; i < ohlcData.length; i++) {
+    const prevClose = ohlcData[i - 1].close;
+    const highLow = ohlcData[i].high - ohlcData[i].low;
+    const highPrevClose = Math.abs(ohlcData[i].high - prevClose);
+    const lowPrevClose = Math.abs(ohlcData[i].low - prevClose);
+
+    const trueRange = Math.max(highLow, highPrevClose, lowPrevClose);
+    atr.push(trueRange);
+  }
+
+  const smoothedATR = atr.map(
+    (_, i, arr) =>
+      arr.slice(Math.max(0, i - period + 1), i + 1).reduce((a, b) => a + b, 0) /
+      Math.min(period, i + 1)
+  );
+
+  // Calculate Supertrend
+  for (let i = 0; i < ohlcData.length; i++) {
+    const hl2 = (ohlcData[i].high + ohlcData[i].low) / 2;
+    upperBand[i] = Number((hl2 + multiplier * smoothedATR[i - 1]).toFixed(2));
+    lowerBand[i] = Number((hl2 - multiplier * smoothedATR[i - 1]).toFixed(2));
+
+    if (i === period || supertrend[i - 1] === "bearish") {
+      supertrend[i] = ohlcData[i].close > lowerBand[i] ? "bullish" : "bearish";
+    } else {
+      supertrend[i] = ohlcData[i].close < upperBand[i] ? "bearish" : "bullish";
+    }
+  }
+
+  return {
+    trend: supertrend[ohlcData.length - 1],
+    upperBand: upperBand[ohlcData.length - 1],
+    lowerBand: lowerBand[ohlcData.length - 1],
+  };
+}
 
 /**
  * Handles the redirection after login to generate a session and fetch user profile.
@@ -184,6 +255,98 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ohlc }, { status: 200 });
   } catch (error: any) {
     console.error("Error in POST API:", error.message);
+    return NextResponse.json(
+      { error: "An unexpected error occurred.", details: error.message },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * PUT request handler for calculating the Supertrend indicator.
+ */
+export async function PUT(request: NextRequest): Promise<NextResponse> {
+  try {
+    if (!accessToken) {
+      return NextResponse.json(
+        { error: "User not authenticated. Please log in." },
+        { status: 401 }
+      );
+    }
+
+    await dbConnect();
+    const body = await request.json();
+    let {
+      company,
+      period = 10,
+      multiplier = 3,
+    }: { company: string; period?: number; multiplier?: number } = body;
+
+    if (!company) {
+      return NextResponse.json(
+        { error: "Company name is required." },
+        { status: 400 }
+      );
+    }
+
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    const formattedYesterday = yesterday.toISOString().split("T")[0];
+
+    const ohlc = await kite.getOHLC([company]);
+    const instrumentToken = ohlc[company]?.instrument_token;
+
+    if (!instrumentToken) {
+      return NextResponse.json(
+        { error: "Instrument token not found for the company." },
+        { status: 404 }
+      );
+    }
+
+    // Get the start date (based on 14 candles)
+    const startDate = new Date();
+    startDate.setMinutes(startDate.getMinutes() - 14 * 3);
+    const formattedStartDate = startDate.toISOString().split("T")[0];
+
+    const historicalData: any = await getHistoricalDataFunc(
+      instrumentToken,
+      formattedYesterday,
+      formattedStartDate
+    );
+
+    if (!historicalData || historicalData.length < 14) {
+      return NextResponse.json(
+        { error: "Insufficient historical data for Supertrend calculation." },
+        { status: 400 }
+      );
+    }
+
+    if (!historicalData) {
+      return NextResponse.json(
+        { error: "Historical data not available." },
+        { status: 404 }
+      );
+    }
+
+    const supertrend: any = calculateSupertrend(
+      historicalData,
+      historicalData.length,
+      multiplier
+    );
+
+    return NextResponse.json(
+      {
+        high: historicalData.high,
+        low: historicalData.low,
+        close: historicalData.close,
+        currentPrice: ohlc[company]?.last_price,
+        supertrend,
+      },
+      { status: 200 }
+    );
+  } catch (error: any) {
+    console.error("Error in Supertrend API:", error.message);
     return NextResponse.json(
       { error: "An unexpected error occurred.", details: error.message },
       { status: 500 }

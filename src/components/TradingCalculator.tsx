@@ -78,6 +78,10 @@ export default function HomeComponent() {
       } else {
         toast.error("Failed to fetch data for the selected company.");
       }
+      const response2 = await axios.put(`${BASEURL}/api/trading/redirect`, {
+        company: selectedCompany, // Send the selected company to the API
+      });
+      if (response2.data) showSupertrendToast(response2.data);
     } catch (error: any) {
       console.error("Error fetching market data:", error);
 
@@ -89,6 +93,28 @@ export default function HomeComponent() {
 
       toast.error(errorMessage);
     }
+  };
+
+  const showSupertrendToast = (data: {
+    currentPrice: number;
+    supertrend: { trend: string; upperBand: number; lowerBand: number };
+  }) => {
+    const { currentPrice, supertrend } = data;
+    const trendEmoji = supertrend.trend === "bullish" ? "📈" : "📉";
+    const trendColor = supertrend.trend === "bullish" ? "#22C55E" : "#EF4444"; // Green for bullish, Red for bearish
+
+    toast(
+      `${trendEmoji} Supertrend Alert: ${supertrend.trend.toUpperCase()}  
+       🔹 Current Price: ₹${currentPrice}  
+       🔹 Upper Band: ₹${supertrend.upperBand}  
+       🔹 Lower Band: ₹${supertrend.lowerBand}`,
+      {
+        position: "top-right",
+        autoClose: 5000,
+        theme: "dark",
+        style: { backgroundColor: trendColor, color: "#fff" },
+      }
+    );
   };
 
   return (
