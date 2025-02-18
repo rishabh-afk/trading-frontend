@@ -1,5 +1,6 @@
 import { KiteConnect } from "kiteconnect";
 import { dbConnect } from "@/lib/mongodb";
+import Supertrend from "@/modals/Supertrend";
 import CompanyLevels from "@/modals/CompanyLevel";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -56,42 +57,80 @@ async function getHistoricalDataFunc(
 /**
  * Calculates the Supertrend indicator based on historical OHLC data.
  */
+// function calculateSupertrend(
+//   ohlcData: HistoricalData[],
+//   period: number = 10,
+//   multiplier: number = 3.5
+// ) {
+//   if (ohlcData.length === 0) {
+//     throw new Error("Insufficient historical data for Supertrend calculation.");
+//   }
+
+//   let atr: number[] = [];
+//   let upperBand: number[] = [];
+//   let lowerBand: number[] = [];
+//   let supertrend: ("bullish" | "bearish")[] = [];
+
+//   // Calculate ATR (Average True Range)
+//   for (let i = 1; i < ohlcData.length; i++) {
+//     const prevClose = ohlcData[i - 1].close;
+//     const highLow = ohlcData[i].high - ohlcData[i].low;
+//     const highPrevClose = Math.abs(ohlcData[i].high - prevClose);
+//     const lowPrevClose = Math.abs(ohlcData[i].low - prevClose);
+
+//     const trueRange = Math.max(highLow, highPrevClose, lowPrevClose);
+//     atr.push(trueRange);
+//   }
+
+//   const smoothedATR = atr.map(
+//     (_, i, arr) =>
+//       arr.slice(Math.max(0, i - period + 1), i + 1).reduce((a, b) => a + b, 0) /
+//       Math.min(period, i + 1)
+//   );
+
+//   // Calculate Supertrend
+//   for (let i = 0; i < ohlcData.length; i++) {
+//     const hl2 = (ohlcData[i].high + ohlcData[i].low) / 2;
+//     upperBand[i] = Number((hl2 + multiplier * 5).toFixed(2));
+//     // upperBand[i] = Number((hl2 + multiplier * smoothedATR[i - 1]).toFixed(2));
+//     lowerBand[i] = Number((hl2 - multiplier * 5).toFixed(2));
+//     // lowerBand[i] = Number((hl2 - multiplier * smoothedATR[i - 1]).toFixed(2));
+
+//     if (i === period || supertrend[i - 1] === "bearish") {
+//       supertrend[i] = ohlcData[i].close > lowerBand[i] ? "bullish" : "bearish";
+//     } else {
+//       supertrend[i] = ohlcData[i].close < upperBand[i] ? "bearish" : "bullish";
+//     }
+//   }
+
+//   return {
+//     trend: supertrend[ohlcData.length - 1],
+//     upperBand: upperBand[ohlcData.length - 1],
+//     lowerBand: lowerBand[ohlcData.length - 1],
+//   };
+// }
+
 function calculateSupertrend(
   ohlcData: HistoricalData[],
   period: number = 10,
-  multiplier: number = 3
+  multiplier: number = 3.5
 ) {
   if (ohlcData.length === 0) {
     throw new Error("Insufficient historical data for Supertrend calculation.");
   }
 
-  let atr: number[] = [];
   let upperBand: number[] = [];
   let lowerBand: number[] = [];
   let supertrend: ("bullish" | "bearish")[] = [];
 
-  // Calculate ATR (Average True Range)
-  for (let i = 1; i < ohlcData.length; i++) {
-    const prevClose = ohlcData[i - 1].close;
-    const highLow = ohlcData[i].high - ohlcData[i].low;
-    const highPrevClose = Math.abs(ohlcData[i].high - prevClose);
-    const lowPrevClose = Math.abs(ohlcData[i].low - prevClose);
-
-    const trueRange = Math.max(highLow, highPrevClose, lowPrevClose);
-    atr.push(trueRange);
-  }
-
-  const smoothedATR = atr.map(
-    (_, i, arr) =>
-      arr.slice(Math.max(0, i - period + 1), i + 1).reduce((a, b) => a + b, 0) /
-      Math.min(period, i + 1)
-  );
+  // ATR is set to a constant value of 5
+  const atr = 5;
 
   // Calculate Supertrend
   for (let i = 0; i < ohlcData.length; i++) {
     const hl2 = (ohlcData[i].high + ohlcData[i].low) / 2;
-    upperBand[i] = Number((hl2 + multiplier * smoothedATR[i - 1]).toFixed(2));
-    lowerBand[i] = Number((hl2 - multiplier * smoothedATR[i - 1]).toFixed(2));
+    upperBand[i] = Number((hl2 + multiplier * atr).toFixed(2));
+    lowerBand[i] = Number((hl2 - multiplier * atr).toFixed(2));
 
     if (i === period || supertrend[i - 1] === "bearish") {
       supertrend[i] = ohlcData[i].close > lowerBand[i] ? "bullish" : "bearish";
@@ -105,6 +144,18 @@ function calculateSupertrend(
     upperBand: upperBand[ohlcData.length - 1],
     lowerBand: lowerBand[ohlcData.length - 1],
   };
+}
+
+async function saveSupertrendData(
+  companyName: string,
+  supertrendResult: ReturnType<typeof calculateSupertrend>
+) {
+  const data = new Supertrend({
+    company: companyName,
+    ...supertrendResult,
+  });
+
+  await data.save();
 }
 
 /**
@@ -222,11 +273,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       });
       if (!companyData) {
         // Fetch yesterday's historical data if not found in the database
+        const startDate = formattedYesterday; // "YYYY-MM-DD"
+        const endDate = formattedYesterday; // "YYYY-MM-DD"
+
         const historicalData: any = await kite.getHistoricalData(
           instrumentToken,
           "day",
-          formattedYesterday,
-          formattedYesterday
+          startDate,
+          endDate
         );
 
         if (historicalData && historicalData.length > 0) {
@@ -334,6 +388,11 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
       historicalData.length,
       multiplier
     );
+
+    await saveSupertrendData(company, {
+      ...supertrend,
+      currentPrice: ohlc[company]?.last_price,
+    });
 
     return NextResponse.json(
       {

@@ -2,12 +2,16 @@ import axios from "axios";
 import React from "react";
 import { toast } from "react-toastify";
 
-const DownloadExcel = ({ selectedCompany }: { selectedCompany: any }) => {
-  const handleDownloadExcel = async () => {
+const DownloadSupertrendExcel = ({
+  selectedCompany,
+}: {
+  selectedCompany: any;
+}) => {
+  const handleDownloadSupertrendExcel = async () => {
     try {
       if (!selectedCompany) return toast.info("Please select a company!");
       const response = await axios.get(
-        "/api/generate-excel?company=" + selectedCompany,
+        "/api/generate-supertrend-excel?company=" + selectedCompany,
         { responseType: "blob" }
       );
 
@@ -33,12 +37,12 @@ const DownloadExcel = ({ selectedCompany }: { selectedCompany: any }) => {
   };
   return (
     <button
-      onClick={handleDownloadExcel}
-      className="bg-green-500 text-white text-lg rounded px-4 py-2"
+      onClick={handleDownloadSupertrendExcel}
+      className="bg-orange-500 text-white text-lg rounded px-4 py-2"
     >
-      Download Trades
+      Download Supertrend
     </button>
   );
 };
 
-export default DownloadExcel;
+export default DownloadSupertrendExcel;

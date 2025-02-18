@@ -1,5 +1,5 @@
 import { toast } from "react-toastify";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 const Runtimer = ({
   makeApiCall,
@@ -9,6 +9,7 @@ const Runtimer = ({
   selectedCompany: any;
 }) => {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [isApiRunning, setIsApiRunning] = useState(false);
 
   useEffect(() => {
     const getISTTime = () => {
@@ -48,6 +49,9 @@ const Runtimer = ({
     };
 
     const scheduleApiCalls = () => {
+      if (isApiRunning) return; // Prevent starting a new interval if it's already running
+      setIsApiRunning(true);
+
       const nextInterval = getNextInterval();
       const delay = nextInterval.getTime() - getISTTime().getTime();
 
@@ -58,6 +62,7 @@ const Runtimer = ({
           if (nowIST > endTime) {
             clearInterval(intervalRef.current!);
             toast.info("End of trading session at 3:30 PM IST");
+            setIsApiRunning(false); // Reset API running state
             return;
           }
           makeApiCall(selectedCompany);
@@ -69,8 +74,9 @@ const Runtimer = ({
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
+      setIsApiRunning(false); // Cleanup on component unmount or when selectedCompany changes
     };
-  }, [selectedCompany]);
+  }, [selectedCompany]); // The effect runs whenever selectedCompany changes
 
   return <div></div>;
 };

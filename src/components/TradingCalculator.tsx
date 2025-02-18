@@ -4,10 +4,11 @@ import axios from "axios";
 import Runtimer from "./Runtimer";
 import { toast } from "react-toastify";
 import LoginButton from "./LoginButton";
-import { Suspense, useState } from "react";
+import { Suspense, useRef, useState } from "react";
 import DownloadExcel from "./DownloadExcel";
 import "react-toastify/dist/ReactToastify.css";
 import CalculatedPoints from "./CalculatedPoints";
+import DownloadSupertrendExcel from "./DownloadSupertrendExcel";
 
 const BASEURL =
   process.env.NEXT_PUBLIC_API_URL || "https://trading-frontend-roan.vercel.app";
@@ -23,27 +24,16 @@ const companies = [
   { label: "Nifty Bank", value: "NSE:NIFTY BANK" },
   { label: "State Bank of India", value: "NSE:SBIN" },
   { label: "Kotak Mahindra Bank", value: "NSE:KOTAKBANK" },
-  { label: "Sensex", value: "BSE:SENSEX" }, // Added Sensex
+  { label: "Sensex", value: "BSE:SENSEX" },
 ];
+
 export default function HomeComponent() {
-  const [selectedCompany, setSelectedCompany] = useState(companies[0].value);
   const [points, setPoints] = useState<any>({});
-  const [formData, setFormData] = useState({
-    currentPrice: 24250,
-  });
+  const selectRef = useRef<HTMLSelectElement>(null);
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: parseFloat(value) || value,
-    });
-    if (name === "company") setSelectedCompany(value);
-  };
+  console.log(selectRef);
 
-  const buy = async (data: any) => {
+  const buy = async (data: any, selectedCompany: string) => {
     try {
       const response = await axios.post(`${BASEURL}/api/trades`, {
         price: data.currentPrice,
@@ -58,40 +48,27 @@ export default function HomeComponent() {
       toast.error(error?.response?.data?.message || "Failed to execute trade.");
     }
   };
-  const makeApiCall = async (selectedCompany: any) => {
+
+  const makeApiCall = async () => {
+    const selectedCompany = selectRef.current?.value;
+    if (!selectedCompany) return toast.warn("Please select a company!");
     try {
-      if (!selectedCompany) {
-        return toast.warn("Please select a company!");
-      }
       const response = await axios.post(`${BASEURL}/api/trading/redirect`, {
-        companies: [selectedCompany], // Send the selected company to the API
+        companies: [selectedCompany],
       });
       const { ohlc } = response?.data;
       if (ohlc && ohlc[selectedCompany]) {
-        const companyData = ohlc[selectedCompany];
-
-        if (companyData) {
-          const lastPrice = companyData.last_price;
-          setFormData({ currentPrice: lastPrice });
-          await buy({ currentPrice: lastPrice });
-        } else toast.error("Selected company's data is unavailable.");
-      } else {
-        toast.error("Failed to fetch data for the selected company.");
-      }
+        const lastPrice = ohlc[selectedCompany].last_price;
+        await buy({ currentPrice: lastPrice }, selectedCompany);
+      } else toast.error("Selected company's data is unavailable.");
       const response2 = await axios.put(`${BASEURL}/api/trading/redirect`, {
-        company: selectedCompany, // Send the selected company to the API
+        company: selectedCompany,
       });
       if (response2.data) showSupertrendToast(response2.data);
     } catch (error: any) {
-      console.error("Error fetching market data:", error);
-
-      // Handle different types of errors and display appropriate messages
-      const errorMessage =
-        error?.response?.data?.message ||
-        error?.message ||
-        "An unexpected error occurred while fetching market data.";
-
-      toast.error(errorMessage);
+      toast.error(
+        error?.response?.data?.message || "Error fetching market data."
+      );
     }
   };
 
@@ -100,14 +77,11 @@ export default function HomeComponent() {
     supertrend: { trend: string; upperBand: number; lowerBand: number };
   }) => {
     const { currentPrice, supertrend } = data;
-    const trendEmoji = supertrend.trend === "bullish" ? "📈" : "📉";
-    const trendColor = supertrend.trend === "bullish" ? "#22C55E" : "#EF4444"; // Green for bullish, Red for bearish
-
+    const trendColor = supertrend.trend === "bullish" ? "#22C55E" : "#EF4444";
     toast(
-      `${trendEmoji} Supertrend Alert: ${supertrend.trend.toUpperCase()}  
-       🔹 Current Price: ₹${currentPrice}  
-       🔹 Upper Band: ₹${supertrend.upperBand}  
-       🔹 Lower Band: ₹${supertrend.lowerBand}`,
+      `📊 Supertrend Alert: ${supertrend.trend.toUpperCase()}\nCurrent Price: ₹${currentPrice}\nUpper Band: ₹${
+        supertrend.upperBand
+      }\nLower Band: ₹${supertrend.lowerBand}`,
       {
         position: "top-right",
         autoClose: 5000,
@@ -120,25 +94,25 @@ export default function HomeComponent() {
   return (
     <div className="flex flex-col p-10 items-center justify-center min-h-screen bg-gradient-to-br from-gray-800 to-gray-900 px-4">
       <div className="flex justify-center items-center mb-8 gap-6">
-        <h1 className="text-4xl font-bold text-white animate-fadeIn">
-          Trading Prediction
-        </h1>
+        <h1 className="text-4xl font-bold text-white">Trading Prediction</h1>
         <Suspense fallback={<div>Loading...</div>}>
           <LoginButton />
         </Suspense>
-        <Runtimer selectedCompany={selectedCompany} makeApiCall={makeApiCall} />
-        <DownloadExcel selectedCompany={selectedCompany} />
+        <Runtimer
+          makeApiCall={makeApiCall}
+          selectedCompany={selectRef.current?.value}
+        />
+        <DownloadExcel selectedCompany={selectRef.current?.value} />
+        <DownloadSupertrendExcel selectedCompany={selectRef.current?.value} />
       </div>
       <div className="bg-gray-700 rounded-lg p-6 shadow-lg text-white max-w-md w-full">
         <h2 className="text-lg font-semibold mb-4">Select Company</h2>
         <div className="mb-4">
           <select
-            name="company"
-            required={true}
-            value={selectedCompany}
-            onChange={handleChange}
+            ref={selectRef}
             className="w-full p-3 rounded-md bg-gray-800 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
+            <option value="">Select a company</option>
             {companies.map((company) => (
               <option key={company.value} value={company.value}>
                 {company.label}
@@ -147,7 +121,7 @@ export default function HomeComponent() {
           </select>
         </div>
         <button
-          onClick={() => makeApiCall(selectedCompany)}
+          onClick={makeApiCall}
           className="mt-2 w-full py-2 px-4 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-md shadow-md transition duration-200"
         >
           Fetch & Execute Trade
