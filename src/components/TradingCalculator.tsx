@@ -31,8 +31,6 @@ export default function HomeComponent() {
   const [points, setPoints] = useState<any>({});
   const selectRef = useRef<HTMLSelectElement>(null);
 
-  console.log(selectRef);
-
   const buy = async (data: any, selectedCompany: string) => {
     try {
       const response = await axios.post(`${BASEURL}/api/trades`, {
