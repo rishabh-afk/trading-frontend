@@ -43,20 +43,39 @@ export async function POST(req: Request) {
         $lte: new Date(`${formattedYesterday}T23:59:59Z`),
       },
     });
-    const { high, low, close } = historicalData;
+    if (historicalData) {
+      const { high, low, close } = historicalData;
 
-    const bc = parseFloat(((high + low) / 2).toFixed(2));
-    const percentageValue = parseFloat((bc * 0.0006).toFixed(2));
-    const bufferValue = Math.round(percentageValue);
+      const bc = parseFloat(((high + low) / 2).toFixed(2));
+      const percentageValue = parseFloat((bc * 0.0006).toFixed(2));
+      const bufferValue = Math.round(percentageValue);
 
-    // Create and save the trade
-    const trade = new Trade({ high, low, close, price, company, bufferValue });
-    trade.calculateLevels();
-    trade.generateSignal(bufferValue);
+      // Create and save the trade
+      const trade = new Trade({
+        high,
+        low,
+        close,
+        price,
+        company,
+        bufferValue,
+      });
+      trade.calculateLevels();
+      const { signal } = trade.generateSignal(bufferValue);
+      if (signal === "Buy" || signal === "Sell") {
+        const lastTrade = await Trade.findOne({ company: company }).sort({
+          createdAt: -1,
+        });
+        if (lastTrade) {
+          if (lastTrade.signal !== signal)
+            trade.type = lastTrade.type === "Entry" ? "Exit" : "Entry";
+          else
+            return createResponse(false, { message: "No action taken." }, 200);
+        } else trade.type = "Entry";
 
-    await trade.save();
-
-    return createResponse(true, { trade }, 201);
+        await trade.save();
+      }
+      return createResponse(true, { trade }, 201);
+    } else return createResponse(true, { message: "No Data Found" }, 200);
   } catch (error: any) {
     console.error("Error creating trade:", error.message);
     return createResponse(

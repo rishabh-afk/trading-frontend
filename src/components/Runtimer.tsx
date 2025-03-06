@@ -72,10 +72,10 @@ const Runtimer = ({
 
     scheduleApiCalls();
 
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      setIsApiRunning(false); // Cleanup on component unmount or when selectedCompany changes
-    };
+    // return () => {
+    //   if (intervalRef.current) clearInterval(intervalRef.current);
+    //   setIsApiRunning(false); // Cleanup on component unmount or when selectedCompany changes
+    // };
   }, [selectedCompany]); // The effect runs whenever selectedCompany changes
 
   return <div></div>;

@@ -3,6 +3,7 @@ import { dbConnect } from "@/lib/mongodb";
 import Supertrend from "@/modals/Supertrend";
 import CompanyLevels from "@/modals/CompanyLevel";
 import { NextRequest, NextResponse } from "next/server";
+import Trade from "@/modals/Trade";
 
 interface HistoricalData {
   high: number;
@@ -311,6 +312,204 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     console.error("Error in POST API:", error.message);
     return NextResponse.json(
       { error: "An unexpected error occurred.", details: error.message },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest): Promise<NextResponse> {
+  try {
+    if (!accessToken) {
+      const loginUrl = kite.getLoginURL();
+      if (!loginUrl) {
+        return NextResponse.json(
+          { error: "Failed to generate login URL." },
+          { status: 500 }
+        );
+      }
+      return NextResponse.redirect(loginUrl);
+    }
+
+    await dbConnect();
+    const body = await request.json();
+    let {
+      companies: company,
+      date,
+      historical = true,
+    }: { companies: string; date: string; historical?: boolean } = body;
+
+    company = company[0];
+
+    if (!company || !date) {
+      return NextResponse.json(
+        { error: "Company name and date are required in the request body." },
+        { status: 400 }
+      );
+    }
+
+    // Convert date from "DD-MM-YYYY" to "YYYY-MM-DD"
+    const [day, month, year] = date.split("-").map(Number);
+    const formattedDate = `${year}-${String(month).padStart(2, "0")}-${String(
+      day
+    ).padStart(2, "0")}`;
+
+    const ohlc = await kite.getOHLC([company]);
+    const instrumentToken = ohlc[company]?.instrument_token;
+
+    let companyData: HistoricalData | null = null;
+
+    if (historical) {
+      const marketCloseTime = new Date();
+      marketCloseTime.setHours(17, 30, 0, 0); // 5:30 PM IST
+
+      const currentTime = new Date();
+      const isAfterMarketClose = currentTime > marketCloseTime;
+
+      // Check if data already exists in the database
+      companyData = await CompanyLevels.findOne({
+        company,
+        createdAt: {
+          $gte: new Date(`${formattedDate}T00:00:00Z`),
+          $lte: new Date(`${formattedDate}T23:59:59Z`),
+        },
+      });
+
+      if (!companyData) {
+        // Fetch historical data for the provided date
+        const historicalData: any = await kite.getHistoricalData(
+          instrumentToken,
+          "day",
+          formattedDate,
+          formattedDate
+        );
+
+        if (historicalData && historicalData.length > 0) {
+          const { high, low, close } = historicalData[0];
+
+          // Store historical data with the correct timestamp
+          companyData = await CompanyLevels.create({
+            company,
+            high,
+            low,
+            close,
+            createdAt: new Date(`${formattedDate}T23:59:59Z`), // Set createdAt to given date
+          });
+
+          console.log(
+            `Fetched and stored historical data for ${company} (${formattedDate}).`
+          );
+        } else if (isAfterMarketClose) {
+          return NextResponse.json(
+            { error: `Historical data not available for ${date}.` },
+            { status: 404 }
+          );
+        }
+      }
+    }
+    return NextResponse.json({ ohlc }, { status: 200 });
+  } catch (error: any) {
+    console.error("Error in POST API:", error.message);
+    return NextResponse.json(
+      { error: "An unexpected error occurred.", details: error.message },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(req: Request) {
+  try {
+    if (!accessToken) {
+      const loginUrl = kite.getLoginURL();
+      if (!loginUrl) {
+        return NextResponse.json(
+          { error: "Failed to generate login URL." },
+          { status: 500 }
+        );
+      }
+      return NextResponse.redirect(loginUrl);
+    }
+
+    await dbConnect();
+    const { price, company, date } = await req.json();
+
+    // Convert date from "DD-MM-YYYY" to "YYYY-MM-DD"
+    const [day, month, year] = date.split("-").map(Number);
+    const formattedDate = `${year}-${String(month).padStart(2, "0")}-${String(
+      day
+    ).padStart(2, "0")}`;
+
+    // Fetch historical daily data from the database
+    const historicalData = await CompanyLevels.findOne({
+      company,
+      createdAt: {
+        $gte: new Date(`${formattedDate}T00:00:00Z`),
+        $lte: new Date(`${formattedDate}T23:59:59Z`),
+      },
+    });
+
+    if (!historicalData) {
+      return NextResponse.json(
+        { error: "Historical Data not found" },
+        { status: 400 }
+      );
+    }
+
+    const ohlcData = await kite.getOHLC([company]);
+    const instrumentToken = ohlcData[company]?.instrument_token;
+
+    // Fetch 3-minute interval historical data for the given date
+    const ohlc: any = await kite.getHistoricalData(
+      instrumentToken,
+      "3minute",
+      formattedDate,
+      formattedDate
+    );
+
+    if (!ohlc || ohlc.length === 0) {
+      return NextResponse.json(
+        { error: "No 3-minute data found." },
+        { status: 400 }
+      );
+    }
+
+    // Apply buy/sell logic for each 3-minute data entry
+    const trades = [];
+    const { high, low, close } = ohlc[0];
+    const bc = parseFloat(((high + low) / 2).toFixed(2));
+    const percentageValue = parseFloat((bc * 0.0006).toFixed(2));
+    const bufferValue = Math.round(percentageValue);
+
+    for (const candle of ohlc) {
+      const { open } = candle;
+
+      const trade = new Trade({
+        high,
+        low,
+        close,
+        company,
+        price: open,
+        bufferValue,
+      });
+      trade.calculateLevels();
+      const { signal } = trade.generateSignal(bufferValue);
+      if (signal === "Buy" || signal === "Sell") {
+        const lastTrade = await Trade.findOne({ company }).sort({
+          createdAt: -1,
+        });
+        if (lastTrade) {
+          if (lastTrade.signal !== signal)
+            trade.type = lastTrade.type === "Entry" ? "Exit" : "Entry";
+          else continue;
+        } else trade.type = "Entry";
+        await trade.save();
+        trades.push(trade);
+      }
+    }
+    return NextResponse.json({ message: "Success" }, { status: 200 });
+  } catch (error: any) {
+    console.error("Error creating trade:", error.message);
+    return NextResponse.json(
+      { error: error.message || "Error creating trade" },
       { status: 500 }
     );
   }

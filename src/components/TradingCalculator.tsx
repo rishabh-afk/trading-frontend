@@ -4,10 +4,10 @@ import axios from "axios";
 import Runtimer from "./Runtimer";
 import { toast } from "react-toastify";
 import LoginButton from "./LoginButton";
-import { Suspense, useRef, useState } from "react";
 import DownloadExcel from "./DownloadExcel";
 import "react-toastify/dist/ReactToastify.css";
 import CalculatedPoints from "./CalculatedPoints";
+import { Suspense, useRef, useState } from "react";
 import DownloadSupertrendExcel from "./DownloadSupertrendExcel";
 
 const BASEURL =
@@ -59,10 +59,14 @@ export default function HomeComponent() {
         const lastPrice = ohlc[selectedCompany].last_price;
         await buy({ currentPrice: lastPrice }, selectedCompany);
       } else toast.error("Selected company's data is unavailable.");
-      const response2 = await axios.put(`${BASEURL}/api/trading/redirect`, {
-        company: selectedCompany,
-      });
-      if (response2.data) showSupertrendToast(response2.data);
+      // const response2 = await axios.put(`${BASEURL}/api/trading/redirect`, {
+      //   company: selectedCompany,
+      // });
+      // if (response2.data) showSupertrendToast(response2.data);
+      // const response = await axios.patch(`${BASEURL}/api/trading/redirect`, {
+      //   company: selectedCompany,
+      //   date: "05-03-2025",
+      // });
     } catch (error: any) {
       toast.error(
         error?.response?.data?.message || "Error fetching market data."
@@ -70,24 +74,24 @@ export default function HomeComponent() {
     }
   };
 
-  const showSupertrendToast = (data: {
-    currentPrice: number;
-    supertrend: { trend: string; upperBand: number; lowerBand: number };
-  }) => {
-    const { currentPrice, supertrend } = data;
-    const trendColor = supertrend.trend === "bullish" ? "#22C55E" : "#EF4444";
-    toast(
-      `📊 Supertrend Alert: ${supertrend.trend.toUpperCase()}\nCurrent Price: ₹${currentPrice}\nUpper Band: ₹${
-        supertrend.upperBand
-      }\nLower Band: ₹${supertrend.lowerBand}`,
-      {
-        position: "top-right",
-        autoClose: 5000,
-        theme: "dark",
-        style: { backgroundColor: trendColor, color: "#fff" },
-      }
-    );
-  };
+  // const showSupertrendToast = (data: {
+  //   currentPrice: number;
+  //   supertrend: { trend: string; upperBand: number; lowerBand: number };
+  // }) => {
+  //   const { currentPrice, supertrend } = data;
+  //   const trendColor = supertrend.trend === "bullish" ? "#22C55E" : "#EF4444";
+  //   toast(
+  //     `📊 Supertrend Alert: ${supertrend.trend.toUpperCase()}\nCurrent Price: ₹${currentPrice}\nUpper Band: ₹${
+  //       supertrend.upperBand
+  //     }\nLower Band: ₹${supertrend.lowerBand}`,
+  //     {
+  //       position: "top-right",
+  //       autoClose: 5000,
+  //       theme: "dark",
+  //       style: { backgroundColor: trendColor, color: "#fff" },
+  //     }
+  //   );
+  // };
 
   return (
     <div className="flex flex-col p-10 items-center justify-center min-h-screen bg-gradient-to-br from-gray-800 to-gray-900 px-4">

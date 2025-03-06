@@ -5,9 +5,10 @@ import { toast } from "react-toastify";
 const DownloadExcel = ({ selectedCompany }: { selectedCompany: any }) => {
   const handleDownloadExcel = async () => {
     try {
+      selectedCompany = "NSE:LT";
       if (!selectedCompany) return toast.info("Please select a company!");
       const response = await axios.get(
-        "/api/generate-excel?company=" + selectedCompany,
+        "/api/generate-excel?company=" + "BSE:SENSEX",
         { responseType: "blob" }
       );
 

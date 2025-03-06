@@ -30,7 +30,7 @@ export async function GET(request) {
 
     // Set start of the day for 9:15 AM IST
     const startOfDay = new Date(today);
-    startOfDay.setUTCHours(9 - 5, 15 - 30, 0, 0); // Adjust to UTC (IST - 5:30)
+    startOfDay.setUTCHours(7 - 5, 15 - 30, 0, 0); // Adjust to UTC (IST - 5:30)
 
     // Set end of the day for 3:30 PM IST
     const endOfDay = new Date(today);
@@ -62,29 +62,91 @@ export async function GET(request) {
       sanitizeSheetName(`Trades-${company}`)
     );
 
+    const formatToIST = (date) => {
+      if (!date) return "N/A";
+      return new Date(date).toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata",
+      });
+    };
+
+    const groupTrades = (trades) => {
+      const groupedTrades = [];
+      let i = 0;
+
+      while (i < trades.length) {
+        const entryTrade = trades[i];
+        const exitTrade = trades[i + 1];
+
+        if (entryTrade.type === "Entry" && exitTrade?.type === "Exit") {
+          groupedTrades.push({
+            entry: entryTrade,
+            exit: exitTrade,
+            profitLoss:
+              entryTrade.signal === "Buy"
+                ? exitTrade.price - entryTrade.price
+                : entryTrade.price - exitTrade.price,
+            formatted: [
+              entryTrade.signal,
+              entryTrade.reason,
+              formatToIST(entryTrade.entryTime),
+              entryTrade.price,
+              exitTrade.reason,
+              formatToIST(exitTrade.entryTime),
+              exitTrade.price,
+            ],
+          });
+          i += 2; // Move to the next pair
+        } else {
+          groupedTrades.push({
+            entry: entryTrade,
+            exit: null,
+            profitLoss: null, // No exit, so we cannot calculate profit/loss
+            formatted: [
+              entryTrade.signal,
+              entryTrade.reason,
+              formatToIST(entryTrade.entryTime),
+              entryTrade.price,
+              null, // No exit reason
+              null, // No exit time
+              null, // No exit price
+            ],
+          });
+          i += 1; // Move to the next trade
+        }
+      }
+
+      return groupedTrades;
+    };
+
+    const groupedEntries = groupTrades(trades);
+
     // Define header row with styles
     worksheet
       .addRow([
-        "Company",
-        "High",
-        "Low",
-        "Close",
-        "Price",
-        "Signal",
+        // "Company",
+        // "High",
+        // "Low",
+        // "Close",
+        "BUY / SELL",
+        "Entry Reason",
         "Entry Time",
+        "Entry Price",
+        "Exit Reason",
         "Exit Time",
-        "Pivot",
-        "BC",
-        "TC",
-        "R1",
-        "R2",
-        "R3",
-        "R4",
-        "S1",
-        "S2",
-        "S3",
-        "S4",
-        "Buffer",
+        "Exit Price",
+        "Profit / Loss",
+        // "Pivot",
+        // "BC",
+        // "TC",
+        // "R1",
+        // "R2",
+        // "R3",
+        // "R4",
+        // "S1",
+        // "S2",
+        // "S3",
+        // "S4",
+        // "Buffer",
       ])
       .eachCell((cell) => {
         cell.font = { bold: true };
@@ -102,36 +164,27 @@ export async function GET(request) {
         };
       });
 
-    const formatToIST = (date) => {
-      if (!date) return "N/A";
-      return new Date(date).toLocaleString("en-IN", {
-        timeZone: "Asia/Kolkata",
-      });
-    };
-
     // Add data rows
-    trades.forEach((trade) => {
+    groupedEntries.forEach((trade) => {
       worksheet.addRow([
-        trade.company,
-        trade.high,
-        trade.low,
-        trade.close,
-        trade.price,
-        trade.signal,
-        formatToIST(trade.entryTime),
-        formatToIST(trade.exitTime),
-        trade.levels.pivot,
-        trade.levels.bc,
-        trade.levels.tc,
-        trade.levels.r1,
-        trade.levels.r2,
-        trade.levels.r3,
-        trade.levels.r4,
-        trade.levels.s1,
-        trade.levels.s2,
-        trade.levels.s3,
-        trade.levels.s4,
-        trade.bufferValue ?? "N/A",
+        // trade.company,
+        // trade.high,
+        // trade.low,
+        // trade.close,
+        ...trade.formatted,
+        trade.profitLoss,
+        // trade.levels.pivot,
+        // trade.levels.bc,
+        // trade.levels.tc,
+        // trade.levels.r1,
+        // trade.levels.r2,
+        // trade.levels.r3,
+        // trade.levels.r4,
+        // trade.levels.s1,
+        // trade.levels.s2,
+        // trade.levels.s3,
+        // trade.levels.s4,
+        // trade.bufferValue ?? "N/A",
       ]);
     });
 

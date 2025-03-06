@@ -17,9 +17,11 @@ interface Levels {
 interface ITrade extends Document {
   low: number;
   high: number;
+  type: string;
   close: number;
   price: number;
   signal: string;
+  reason: string;
   levels: Levels;
   exitTime: Date;
   entryTime: Date;
@@ -32,8 +34,10 @@ interface ITrade extends Document {
 
 const TradeSchema = new Schema<ITrade>(
   {
+    type: { type: String, default: "" },
     low: { type: Number, required: true },
     signal: { type: String, default: "" },
+    reason: { type: String, default: "" },
     high: { type: Number, required: true },
     close: { type: Number, required: true },
     price: { type: Number, required: true },
@@ -86,59 +90,78 @@ TradeSchema.methods.calculateLevels = function (): Levels {
   return this.levels;
 };
 
-// Method to generate a signal
-TradeSchema.methods.generateSignal = function (bufferValue: any): string {
+TradeSchema.methods.generateSignal = function (bufferValue: any): {
+  signal: string;
+  reason: string;
+} {
   const { price, levels } = this;
   const { pivot, bc, tc, r1, r2, r3, r4, s1, s2, s3, s4 } = levels;
 
-  const BUFFER = bufferValue ?? 15; // Buffer value
-  let signal = "";
+  const BUFFER = bufferValue ?? 15;
+  let signal = "No Action";
+  let reason = "Price is in a neutral zone.";
 
-  if (price > r4) signal = "Price is above R4. Strong bullish signal.";
-  else if (price > r3 && price <= r4)
-    signal = "Price is between R3 and R4. Approaching strong bullish pressure.";
-  else if (price > r3 - BUFFER && price <= r3)
-    signal = "Price is within R3 ± BUFFER. High bullish potential.";
-  else if (price > r2 && price <= r3)
-    signal = "Price is between R2 and R3. Moderate bullish trend.";
-  else if (price > r2 - BUFFER && price <= r2)
-    signal = "Price is within R2 ± BUFFER. Approaching moderate bullish zone.";
-  else if (price > r1 && price <= r2)
-    signal = "Price is between R1 and R2. Weak bullish trend.";
-  else if (price > r1 - BUFFER && price <= r1)
-    signal = "Price is within R1 ± BUFFER. Approaching weak bullish zone.";
-  else if (price < s4) signal = "Price is below S4. Strong bearish signal.";
-  else if (price >= s4 && price < s3)
-    signal = "Price is between S4 and S3. Strong bearish pressure.";
-  else if (price >= s3 && price < s3 + BUFFER)
-    signal = "Price is within S3 ± BUFFER. High bearish potential.";
-  else if (price >= s3 && price < s2)
-    signal = "Price is between S3 and S2. Moderate bearish trend.";
-  else if (price >= s2 && price < s2 + BUFFER)
-    signal = "Price is within S2 ± BUFFER. Approaching moderate bearish zone.";
-  else if (price >= s2 && price < s1)
-    signal = "Price is between S2 and S1. Weak bearish trend.";
-  else if (price >= s1 && price < s1 + BUFFER)
-    signal = "Price is within S1 ± BUFFER. Approaching weak bearish zone.";
-  else if (price <= tc && price < pivot)
-    signal = "Price is below Pivot and TC. Sell-off detected.";
-  else if (price > tc && price <= tc + BUFFER)
-    signal = "Price is within TC ± BUFFER. Call buy opportunity.";
-  else if (price > tc + BUFFER)
-    signal = "Price is above TC + BUFFER. Strong call signal.";
-  else if (price >= bc && price <= tc)
-    signal = "Price is within BC and TC. Monitoring for trends.";
-  else if (price < bc && price >= bc - BUFFER)
-    signal = "Price is within BC ± BUFFER. Put buy opportunity.";
-  else if (price < bc - BUFFER)
-    signal = "Price is below BC - BUFFER. Strong put signal.";
-
-  // Fallback signal
-  if (!signal) signal = "No specific signal detected. Monitoring the market.";
+  // If price is above TC + BUFFER, check R1 → R2 → R3 → R4
+  if (price > tc + BUFFER) {
+    if (price > r1 && price <= r1 + BUFFER) {
+      signal = "Buy";
+      reason = "Price is between R1 and R1 + BUFFER.";
+    } else if (price > r2 && price <= r2 + BUFFER) {
+      signal = "Buy";
+      reason = "Price is between R2 and R2 + BUFFER.";
+    } else if (price > r3 && price <= r3 + BUFFER) {
+      signal = "Buy";
+      reason = "Price is between R3 and R3 + BUFFER.";
+    } else if (price > r4 && price <= r4 + BUFFER) {
+      signal = "Buy";
+      reason = "Price is between R4 and R4 + BUFFER.";
+    } else {
+      signal = "No Action";
+      reason = "Price is outside buffer.";
+    }
+  }
+  // If price is below BC - BUFFER, check S1 → S2 → S3 → S4
+  else if (price < bc - BUFFER) {
+    if (price < s1 && price >= s1 - BUFFER) {
+      signal = "Sell";
+      reason = "Price is between S1 and S1 - BUFFER.";
+    } else if (price < s2 && price >= s2 - BUFFER) {
+      signal = "Sell";
+      reason = "Price is between S2 and S2 - BUFFER.";
+    } else if (price < s3 && price >= s3 - BUFFER) {
+      signal = "Sell";
+      reason = "Price is between S3 and S3 - BUFFER.";
+    } else if (price < s4 && price >= s4 - BUFFER) {
+      signal = "Sell";
+      reason = "Price is between S4 and S4 - BUFFER.";
+    } else {
+      signal = "No Action";
+      reason = "Price is outside buffer.";
+    }
+  }
+  // If price is within TC and BC
+  else if (price > bc && price < tc) {
+    signal = "No Action";
+    reason = "Price is within CPR range.";
+  }
+  // If price is exactly at TC or BC
+  else if (price === tc) {
+    signal = "No Action";
+    reason = "Price is exactly at TC.";
+  } else if (price > tc && price <= tc + BUFFER) {
+    signal = "Buy";
+    reason = "Price is slightly above TC within buffer.";
+  } else if (price === bc) {
+    signal = "No Action";
+    reason = "Price is exactly at BC.";
+  } else if (price < bc && price >= bc - BUFFER) {
+    signal = "Sell";
+    reason = "Price is slightly below BC within buffer.";
+  }
 
   this.signal = signal;
-  return signal;
+  this.reason = reason;
+  return { signal, reason };
 };
-
 const Trade = mongoose.models.Trade || model<ITrade>("Trade", TradeSchema);
 export default Trade;
