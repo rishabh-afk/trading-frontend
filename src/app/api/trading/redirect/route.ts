@@ -439,25 +439,30 @@ export async function PATCH(req: Request) {
     ).padStart(2, "0")}`;
 
     // Fetch historical daily data from the database
-    const historicalData = await CompanyLevels.findOne({
-      company,
-      createdAt: {
-        $gte: new Date(`${formattedDate}T00:00:00Z`),
-        $lte: new Date(`${formattedDate}T23:59:59Z`),
-      },
-    });
+    // const historicalData = await CompanyLevels.findOne({
+    //   company,
+    //   createdAt: {
+    //     $gte: new Date(`${formattedDate}T00:00:00Z`),
+    //     $lte: new Date(`${formattedDate}T23:59:59Z`),
+    //   },
+    // });
 
-    if (!historicalData) {
-      return NextResponse.json(
-        { error: "Historical Data not found" },
-        { status: 400 }
-      );
-    }
+    // if (!historicalData) {
+    //   return NextResponse.json(
+    //     { error: "Historical Data not found" },
+    //     { status: 400 }
+    //   );
+    // }
 
     const ohlcData = await kite.getOHLC([company]);
     const instrumentToken = ohlcData[company]?.instrument_token;
 
-    // Fetch 3-minute interval historical data for the given date
+    // Convert to YYYY-MM-DD format
+    const [dayl, monthl, yearl] = date.split("-");
+    const givenDate = new Date(`${yearl}-${monthl}-${dayl}`);
+    givenDate.setDate(givenDate.getDate() - 1);
+    const formattedDatel = givenDate.toISOString().split("T")[0];
+
     const ohlc: any = await kite.getHistoricalData(
       instrumentToken,
       "3minute",
@@ -471,17 +476,21 @@ export async function PATCH(req: Request) {
         { status: 400 }
       );
     }
+    // Fetch intraday data for the given date
+    const historicalData: any = await kite.getHistoricalData(
+      instrumentToken,
+      "day", // Use 'minute' or 'hour' interval to get exact 3:30 PM data
+      formattedDatel,
+      formattedDatel
+    );
 
-    // Apply buy/sell logic for each 3-minute data entry
     const trades = [];
-    const { high, low, close } = ohlc[0];
+    const { high, low, close } = historicalData[0];
     const bc = parseFloat(((high + low) / 2).toFixed(2));
     const percentageValue = parseFloat((bc * 0.0006).toFixed(2));
     const bufferValue = Math.round(percentageValue);
-
     for (const candle of ohlc) {
-      const { open } = candle;
-
+      const { open, date } = candle;
       const trade = new Trade({
         high,
         low,
@@ -489,6 +498,8 @@ export async function PATCH(req: Request) {
         company,
         price: open,
         bufferValue,
+        createdAt: date,
+        updatedAt: date,
       });
       trade.calculateLevels();
       const { signal } = trade.generateSignal(bufferValue);

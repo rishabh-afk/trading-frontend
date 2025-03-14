@@ -30,7 +30,7 @@ export async function GET(request) {
 
     // Set start of the day for 9:15 AM IST
     const startOfDay = new Date(today);
-    startOfDay.setUTCHours(7 - 5, 15 - 30, 0, 0); // Adjust to UTC (IST - 5:30)
+    startOfDay.setUTCHours(9 - 5, 15 - 30, 0, 0); // Adjust to UTC (IST - 5:30)
 
     // Set end of the day for 3:30 PM IST
     const endOfDay = new Date(today);
@@ -68,57 +68,6 @@ export async function GET(request) {
         timeZone: "Asia/Kolkata",
       });
     };
-
-    const groupTrades = (trades) => {
-      const groupedTrades = [];
-      let i = 0;
-
-      while (i < trades.length) {
-        const entryTrade = trades[i];
-        const exitTrade = trades[i + 1];
-
-        if (entryTrade.type === "Entry" && exitTrade?.type === "Exit") {
-          groupedTrades.push({
-            entry: entryTrade,
-            exit: exitTrade,
-            profitLoss:
-              entryTrade.signal === "Buy"
-                ? exitTrade.price - entryTrade.price
-                : entryTrade.price - exitTrade.price,
-            formatted: [
-              entryTrade.signal,
-              entryTrade.reason,
-              formatToIST(entryTrade.entryTime),
-              entryTrade.price,
-              exitTrade.reason,
-              formatToIST(exitTrade.entryTime),
-              exitTrade.price,
-            ],
-          });
-          i += 2; // Move to the next pair
-        } else {
-          groupedTrades.push({
-            entry: entryTrade,
-            exit: null,
-            profitLoss: null, // No exit, so we cannot calculate profit/loss
-            formatted: [
-              entryTrade.signal,
-              entryTrade.reason,
-              formatToIST(entryTrade.entryTime),
-              entryTrade.price,
-              null, // No exit reason
-              null, // No exit time
-              null, // No exit price
-            ],
-          });
-          i += 1; // Move to the next trade
-        }
-      }
-
-      return groupedTrades;
-    };
-
-    const groupedEntries = groupTrades(trades);
 
     // Define header row with styles
     worksheet
@@ -164,27 +113,69 @@ export async function GET(request) {
         };
       });
 
+    function processTrades(trades) {
+      const results = [];
+
+      for (let i = 0; i < trades.length - 1; i++) {
+        const entry = trades[i];
+        const exit = trades[i + 1];
+
+        if (entry.signal === "Buy" && exit.signal === "Sell") {
+          results.push({
+            signal: "Buy",
+            entry_reason: entry.reason,
+            entry_time: formatToIST(entry.entryTime),
+            entry_price: entry.price,
+            exit_reason: exit.reason,
+            exit_time: formatToIST(exit.entryTime),
+            exit_price: exit.price,
+            profit_loss: (exit.price - entry.price).toFixed(2),
+          });
+        } else if (entry.signal === "Sell" && exit.signal === "Buy") {
+          results.push({
+            signal: "Sell",
+            entry_reason: entry.reason,
+            entry_time: formatToIST(entry.entryTime),
+            entry_price: entry.price,
+            exit_reason: exit.reason,
+            exit_time: formatToIST(exit.entryTime),
+            exit_price: exit.price,
+            profit_loss: (entry.price - exit.price).toFixed(2),
+          });
+        }
+      }
+
+      // If the last trade is unpaired, add it as is
+      if (trades.length % 2 !== 0) {
+        const lastTrade = trades[trades.length - 1];
+        results.push({
+          signal: lastTrade.signal,
+          entry_reason: lastTrade.reason,
+          entry_time: formatToIST(lastTrade.entryTime),
+          entry_price: lastTrade.price,
+          exit_reason: "Pending",
+          exit_time: "Pending",
+          exit_price: "Pending",
+          profit_loss: "Pending",
+        });
+      }
+
+      return results;
+    }
+
+    const groupedEntries = processTrades(trades);
+
     // Add data rows
     groupedEntries.forEach((trade) => {
       worksheet.addRow([
-        // trade.company,
-        // trade.high,
-        // trade.low,
-        // trade.close,
-        ...trade.formatted,
-        trade.profitLoss,
-        // trade.levels.pivot,
-        // trade.levels.bc,
-        // trade.levels.tc,
-        // trade.levels.r1,
-        // trade.levels.r2,
-        // trade.levels.r3,
-        // trade.levels.r4,
-        // trade.levels.s1,
-        // trade.levels.s2,
-        // trade.levels.s3,
-        // trade.levels.s4,
-        // trade.bufferValue ?? "N/A",
+        trade.signal,
+        trade.entry_reason,
+        trade.entry_time,
+        trade.entry_price,
+        trade.exit_reason,
+        trade.exit_time,
+        trade.exit_price,
+        trade.profit_loss,
       ]);
     });
 
@@ -199,29 +190,6 @@ export async function GET(request) {
             bottom: { style: "thin" },
             right: { style: "thin" },
           };
-
-          // Conditional formatting for levels
-          if (
-            [
-              "Pivot",
-              "BC",
-              "TC",
-              "R1",
-              "R2",
-              "R3",
-              "R4",
-              "S1",
-              "S2",
-              "S3",
-              "S4",
-            ].includes(cell.value)
-          ) {
-            cell.fill = {
-              type: "pattern",
-              pattern: "solid",
-              fgColor: { argb: "E0FFFF" }, // Light Cyan for levels
-            };
-          }
         });
       }
     });

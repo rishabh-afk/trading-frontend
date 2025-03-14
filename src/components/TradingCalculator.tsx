@@ -51,22 +51,22 @@ export default function HomeComponent() {
     const selectedCompany = selectRef.current?.value;
     if (!selectedCompany) return toast.warn("Please select a company!");
     try {
-      const response = await axios.post(`${BASEURL}/api/trading/redirect`, {
-        companies: [selectedCompany],
-      });
-      const { ohlc } = response?.data;
-      if (ohlc && ohlc[selectedCompany]) {
-        const lastPrice = ohlc[selectedCompany].last_price;
-        await buy({ currentPrice: lastPrice }, selectedCompany);
-      } else toast.error("Selected company's data is unavailable.");
+      // const response = await axios.post(`${BASEURL}/api/trading/redirect`, {
+      //   companies: [selectedCompany],
+      // });
+      // const { ohlc } = response?.data;
+      // if (ohlc && ohlc[selectedCompany]) {
+      //   const lastPrice = ohlc[selectedCompany].last_price;
+      //   await buy({ currentPrice: lastPrice }, selectedCompany);
+      // } else toast.error("Selected company's data is unavailable.");
       // const response2 = await axios.put(`${BASEURL}/api/trading/redirect`, {
       //   company: selectedCompany,
       // });
       // if (response2.data) showSupertrendToast(response2.data);
-      // const response = await axios.patch(`${BASEURL}/api/trading/redirect`, {
-      //   company: selectedCompany,
-      //   date: "05-03-2025",
-      // });
+      const response = await axios.patch(`${BASEURL}/api/trading/redirect`, {
+        company: selectedCompany,
+        date: "12-03-2025",
+      });
     } catch (error: any) {
       toast.error(
         error?.response?.data?.message || "Error fetching market data."

@@ -76,7 +76,7 @@ TradeSchema.methods.calculateLevels = function (): Levels {
     ((this.high + this.low + this.close) / 3).toFixed(2)
   );
   const bc = parseFloat(((this.high + this.low) / 2).toFixed(2));
-  const tc = parseFloat((pivot + (pivot - bc)).toFixed(2));
+  const tc = parseFloat((pivot - bc + pivot).toFixed(2));
   const r1 = parseFloat((2 * pivot - this.low).toFixed(2));
   const r2 = parseFloat((pivot + (this.high - this.low)).toFixed(2));
   const r3 = parseFloat((r1 + (this.high - this.low)).toFixed(2));
@@ -95,73 +95,44 @@ TradeSchema.methods.generateSignal = function (bufferValue: any): {
   reason: string;
 } {
   const { price, levels } = this;
-  const { pivot, bc, tc, r1, r2, r3, r4, s1, s2, s3, s4 } = levels;
+  const { bc, tc, r1, r2, r3, r4, s1, s2, s3, s4 } = levels;
 
   const BUFFER = bufferValue ?? 15;
   let signal = "No Action";
   let reason = "Price is in a neutral zone.";
 
-  // If price is above TC + BUFFER, check R1 → R2 → R3 → R4
-  if (price > tc + BUFFER) {
-    if (price > r1 && price <= r1 + BUFFER) {
-      signal = "Buy";
-      reason = "Price is between R1 and R1 + BUFFER.";
-    } else if (price > r2 && price <= r2 + BUFFER) {
-      signal = "Buy";
-      reason = "Price is between R2 and R2 + BUFFER.";
-    } else if (price > r3 && price <= r3 + BUFFER) {
-      signal = "Buy";
-      reason = "Price is between R3 and R3 + BUFFER.";
-    } else if (price > r4 && price <= r4 + BUFFER) {
-      signal = "Buy";
-      reason = "Price is between R4 and R4 + BUFFER.";
-    } else {
-      signal = "No Action";
-      reason = "Price is outside buffer.";
-    }
+  // If price is above TC and within TC + BUFFER, Buy
+  if (price >= tc && price <= tc + BUFFER) {
+    signal = "Buy";
+    reason = "Price is above TC within buffer.";
   }
-  // If price is below BC - BUFFER, check S1 → S2 → S3 → S4
-  else if (price < bc - BUFFER) {
-    if (price < s1 && price >= s1 - BUFFER) {
-      signal = "Sell";
-      reason = "Price is between S1 and S1 - BUFFER.";
-    } else if (price < s2 && price >= s2 - BUFFER) {
-      signal = "Sell";
-      reason = "Price is between S2 and S2 - BUFFER.";
-    } else if (price < s3 && price >= s3 - BUFFER) {
-      signal = "Sell";
-      reason = "Price is between S3 and S3 - BUFFER.";
-    } else if (price < s4 && price >= s4 - BUFFER) {
-      signal = "Sell";
-      reason = "Price is between S4 and S4 - BUFFER.";
-    } else {
-      signal = "No Action";
-      reason = "Price is outside buffer.";
-    }
+  // If price is below BC and within BC - BUFFER, Sell
+  else if (price <= bc && price >= bc - BUFFER) {
+    signal = "Sell";
+    reason = "Price is below BC within buffer.";
   }
-  // If price is within TC and BC
-  else if (price > bc && price < tc) {
+  // If price is between TC and BC, No Action
+  else if (price < tc && price > bc) {
     signal = "No Action";
     reason = "Price is within CPR range.";
   }
-  // If price is exactly at TC or BC
-  else if (price === tc) {
-    signal = "No Action";
-    reason = "Price is exactly at TC.";
-  } else if (price > tc && price <= tc + BUFFER) {
-    signal = "Buy";
-    reason = "Price is slightly above TC within buffer.";
-  } else if (price === bc) {
-    signal = "No Action";
-    reason = "Price is exactly at BC.";
-  } else if (price < bc && price >= bc - BUFFER) {
-    signal = "Sell";
-    reason = "Price is slightly below BC within buffer.";
-  }
+
+  const levelsMap = { r1, r2, r3, r4, s1, s2, s3, s4 };
+
+  Object.entries(levelsMap).forEach(([levelName, level]) => {
+    if (price > level && price <= level + BUFFER) {
+      signal = "Buy";
+      reason = `Price is above ${levelName} (${level}) within buffer.`;
+    } else if (price < level && price >= level - BUFFER) {
+      signal = "Sell";
+      reason = `Price is below ${levelName} (${level}) within buffer.`;
+    }
+  });
 
   this.signal = signal;
   this.reason = reason;
   return { signal, reason };
 };
+
 const Trade = mongoose.models.Trade || model<ITrade>("Trade", TradeSchema);
 export default Trade;
