@@ -55,62 +55,37 @@ async function getHistoricalDataFunc(
   }
 }
 
+function calculateTrueRange(high: any, low: any, prevClose: any) {
+  return Math.max(
+    high - low,
+    Math.abs(high - prevClose),
+    Math.abs(low - prevClose)
+  );
+}
+
+function calculateATR(data: any, period: any) {
+  let atrArray = [];
+  let trArray = [];
+
+  for (let i = 0; i < data.length; i++) {
+    let prevClose = i === 0 ? data[i].close : data[i - 1].close;
+    let tr = calculateTrueRange(data[i].high, data[i].low, prevClose);
+    trArray.push(tr);
+
+    if (i < period) atrArray.push(null);
+    else {
+      let atr =
+        trArray.slice(i - period, i).reduce((sum, val) => sum + val, 0) /
+        period;
+      atrArray.push(atr);
+    }
+  }
+  return atrArray;
+}
+
 /**
  * Calculates the Supertrend indicator based on historical OHLC data.
  */
-// function calculateSupertrend(
-//   ohlcData: HistoricalData[],
-//   period: number = 10,
-//   multiplier: number = 3.5
-// ) {
-//   if (ohlcData.length === 0) {
-//     throw new Error("Insufficient historical data for Supertrend calculation.");
-//   }
-
-//   let atr: number[] = [];
-//   let upperBand: number[] = [];
-//   let lowerBand: number[] = [];
-//   let supertrend: ("bullish" | "bearish")[] = [];
-
-//   // Calculate ATR (Average True Range)
-//   for (let i = 1; i < ohlcData.length; i++) {
-//     const prevClose = ohlcData[i - 1].close;
-//     const highLow = ohlcData[i].high - ohlcData[i].low;
-//     const highPrevClose = Math.abs(ohlcData[i].high - prevClose);
-//     const lowPrevClose = Math.abs(ohlcData[i].low - prevClose);
-
-//     const trueRange = Math.max(highLow, highPrevClose, lowPrevClose);
-//     atr.push(trueRange);
-//   }
-
-//   const smoothedATR = atr.map(
-//     (_, i, arr) =>
-//       arr.slice(Math.max(0, i - period + 1), i + 1).reduce((a, b) => a + b, 0) /
-//       Math.min(period, i + 1)
-//   );
-
-//   // Calculate Supertrend
-//   for (let i = 0; i < ohlcData.length; i++) {
-//     const hl2 = (ohlcData[i].high + ohlcData[i].low) / 2;
-//     upperBand[i] = Number((hl2 + multiplier * 5).toFixed(2));
-//     // upperBand[i] = Number((hl2 + multiplier * smoothedATR[i - 1]).toFixed(2));
-//     lowerBand[i] = Number((hl2 - multiplier * 5).toFixed(2));
-//     // lowerBand[i] = Number((hl2 - multiplier * smoothedATR[i - 1]).toFixed(2));
-
-//     if (i === period || supertrend[i - 1] === "bearish") {
-//       supertrend[i] = ohlcData[i].close > lowerBand[i] ? "bullish" : "bearish";
-//     } else {
-//       supertrend[i] = ohlcData[i].close < upperBand[i] ? "bearish" : "bullish";
-//     }
-//   }
-
-//   return {
-//     trend: supertrend[ohlcData.length - 1],
-//     upperBand: upperBand[ohlcData.length - 1],
-//     lowerBand: lowerBand[ohlcData.length - 1],
-//   };
-// }
-
 function calculateSupertrend(
   ohlcData: HistoricalData[],
   period: number = 10,
@@ -122,24 +97,44 @@ function calculateSupertrend(
 
   let upperBand: number[] = [];
   let lowerBand: number[] = [];
-  let supertrend: ("bullish" | "bearish")[] = [];
+  // let supertrend: ("bullish" | "bearish")[] = [];
 
   // ATR is set to a constant value of 5
-  const atr = 5;
+  // const atr = 5;
+  let atrArray: any = calculateATR(ohlcData, period);
+  let supertrend: any = new Array(ohlcData.length).fill(null);
+
+  console.log(atrArray);
 
   // Calculate Supertrend
   for (let i = 0; i < ohlcData.length; i++) {
+    let atr = atrArray[i];
     const hl2 = (ohlcData[i].high + ohlcData[i].low) / 2;
     upperBand[i] = Number((hl2 + multiplier * atr).toFixed(2));
     lowerBand[i] = Number((hl2 - multiplier * atr).toFixed(2));
 
-    if (i === period || supertrend[i - 1] === "bearish") {
-      supertrend[i] = ohlcData[i].close > lowerBand[i] ? "bullish" : "bearish";
+    // if (i === period || supertrend[i - 1] === "bearish") {
+    //   supertrend[i] = ohlcData[i].close > lowerBand[i] ? "bullish" : "bearish";
+    // } else {
+    //   supertrend[i] = ohlcData[i].close < upperBand[i] ? "bearish" : "bullish";
+    // }
+    if (i === period) {
+      supertrend[i] =
+        ohlcData[i].close > upperBand[i] ? lowerBand[i] : upperBand[i];
+      supertrend[i] = ohlcData[i].close > upperBand[i] ? "bullish" : "bearish";
     } else {
-      supertrend[i] = ohlcData[i].close < upperBand[i] ? "bearish" : "bullish";
+      if (ohlcData[i].close > supertrend[i - 1]) {
+        supertrend[i] = lowerBand[i];
+        supertrend[i] = "bullish";
+      } else if (ohlcData[i].close < supertrend[i - 1]) {
+        supertrend[i] = upperBand[i];
+        supertrend[i] = "bearish";
+      } else {
+        supertrend[i] = supertrend[i - 1];
+      }
     }
   }
-
+  console.log(supertrend);
   return {
     trend: supertrend[ohlcData.length - 1],
     upperBand: upperBand[ohlcData.length - 1],
@@ -438,22 +433,6 @@ export async function PATCH(req: Request) {
       day
     ).padStart(2, "0")}`;
 
-    // Fetch historical daily data from the database
-    // const historicalData = await CompanyLevels.findOne({
-    //   company,
-    //   createdAt: {
-    //     $gte: new Date(`${formattedDate}T00:00:00Z`),
-    //     $lte: new Date(`${formattedDate}T23:59:59Z`),
-    //   },
-    // });
-
-    // if (!historicalData) {
-    //   return NextResponse.json(
-    //     { error: "Historical Data not found" },
-    //     { status: 400 }
-    //   );
-    // }
-
     const ohlcData = await kite.getOHLC([company]);
     const instrumentToken = ohlcData[company]?.instrument_token;
 
@@ -463,7 +442,7 @@ export async function PATCH(req: Request) {
     givenDate.setDate(givenDate.getDate() - 1);
     const formattedDatel = givenDate.toISOString().split("T")[0];
 
-    const ohlc: any = await kite.getHistoricalData(
+    let ohlc: any = await kite.getHistoricalData(
       instrumentToken,
       "3minute",
       formattedDate,
@@ -489,29 +468,57 @@ export async function PATCH(req: Request) {
     const bc = parseFloat(((high + low) / 2).toFixed(2));
     const percentageValue = parseFloat((bc * 0.0006).toFixed(2));
     const bufferValue = Math.round(percentageValue);
+
+    // ohlc = ohlc.slice(5);
+
     for (const candle of ohlc) {
-      const { open, date } = candle;
+      const { open, close: closeAmount, date } = candle;
       const trade = new Trade({
         high,
         low,
         close,
         company,
-        price: open,
         bufferValue,
         createdAt: date,
         updatedAt: date,
+        price: closeAmount,
       });
       trade.calculateLevels();
       const { signal } = trade.generateSignal(bufferValue);
-      if (signal === "Buy" || signal === "Sell") {
-        const lastTrade = await Trade.findOne({ company }).sort({
-          createdAt: -1,
-        });
+      const lastTrade = await Trade.findOne({ company }).sort({
+        createdAt: -1,
+      });
+      if (lastTrade) {
+        const { signal: exitSignal, reason } = trade.exitSignal(
+          lastTrade.signal,
+          bufferValue,
+          open
+        );
+        if (
+          signal !== "Exit" &&
+          exitSignal === "Exit" &&
+          signal !== "No Action" &&
+          lastTrade.signal !== "Exit" &&
+          lastTrade.signal !== signal
+        ) {
+          trade.signal = exitSignal;
+          trade.type = exitSignal;
+          trade.reason = reason;
+          await trade.save();
+          trades.push(trade);
+          continue;
+        }
+      }
+      if (signal === "Buy" || signal === "Sell" || signal === "Exit") {
         if (lastTrade) {
-          if (lastTrade.signal !== signal)
-            trade.type = lastTrade.type === "Entry" ? "Exit" : "Entry";
+          if (lastTrade.signal !== signal) {
+            if (signal === "Exit") trade.type = "Exit";
+            else trade.type = lastTrade.type === "Entry" ? "Exit" : "Entry";
+          } else continue;
+        } else {
+          if (signal !== "Exit") trade.type = "Entry";
           else continue;
-        } else trade.type = "Entry";
+        }
         await trade.save();
         trades.push(trade);
       }
@@ -542,7 +549,7 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
     const body = await request.json();
     let {
       company,
-      period = 10,
+      period = 14,
       multiplier = 3,
     }: { company: string; period?: number; multiplier?: number } = body;
 
@@ -570,16 +577,16 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
 
     // Get the start date (based on 14 candles)
     const startDate = new Date();
-    startDate.setMinutes(startDate.getMinutes() - 14 * 3);
+    startDate.setMinutes(startDate.getMinutes() - period * 3);
     const formattedStartDate = startDate.toISOString().split("T")[0];
 
-    const historicalData: any = await getHistoricalDataFunc(
+    let historicalData: any = await getHistoricalDataFunc(
       instrumentToken,
       formattedYesterday,
       formattedStartDate
     );
 
-    if (!historicalData || historicalData.length < 14) {
+    if (!historicalData || historicalData.length < 13) {
       return NextResponse.json(
         { error: "Insufficient historical data for Supertrend calculation." },
         { status: 400 }
@@ -593,9 +600,11 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
       );
     }
 
+    historicalData = historicalData.slice(-14);
+
     const supertrend: any = calculateSupertrend(
       historicalData,
-      historicalData.length,
+      period,
       multiplier
     );
 

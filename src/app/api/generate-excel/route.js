@@ -34,15 +34,15 @@ export async function GET(request) {
 
     // Set end of the day for 3:30 PM IST
     const endOfDay = new Date(today);
-    endOfDay.setUTCHours(15 - 5, 30 - 30, 0, 0); // Adjust to UTC (IST - 5:30)
+    endOfDay.setUTCHours(22 - 5, 30 - 30, 0, 0); // Adjust to UTC (IST - 5:30)
 
     // Find trades for the specified company within active market hours
     const trades = await Trade.find({
       company: company,
-      createdAt: {
-        $gte: startOfDay,
-        $lte: endOfDay,
-      },
+      // createdAt: {
+      //   $gte: startOfDay,
+      //   $lte: endOfDay,
+      // },
     });
 
     if (trades.length === 0) {
@@ -76,7 +76,7 @@ export async function GET(request) {
         // "High",
         // "Low",
         // "Close",
-        "BUY / SELL",
+        "BUY / SELL / EXIT (No Trade Zone)",
         "Entry Reason",
         "Entry Time",
         "Entry Price",
@@ -120,45 +120,110 @@ export async function GET(request) {
         const entry = trades[i];
         const exit = trades[i + 1];
 
-        if (entry.signal === "Buy" && exit.signal === "Sell") {
-          results.push({
-            signal: "Buy",
-            entry_reason: entry.reason,
-            entry_time: formatToIST(entry.entryTime),
-            entry_price: entry.price,
-            exit_reason: exit.reason,
-            exit_time: formatToIST(exit.entryTime),
-            exit_price: exit.price,
-            profit_loss: (exit.price - entry.price).toFixed(2),
-          });
-        } else if (entry.signal === "Sell" && exit.signal === "Buy") {
-          results.push({
-            signal: "Sell",
-            entry_reason: entry.reason,
-            entry_time: formatToIST(entry.entryTime),
-            entry_price: entry.price,
-            exit_reason: exit.reason,
-            exit_time: formatToIST(exit.entryTime),
-            exit_price: exit.price,
-            profit_loss: (entry.price - exit.price).toFixed(2),
-          });
+        if (entry.signal === "Exit") {
+          // results.push({
+          //   signal: "Exit",
+          //   entry_reason: entry.reason,
+          //   entry_time: formatToIST(entry.entryTime),
+          //   entry_price: entry.price,
+          //   exit_reason: "No Trade Zone",
+          //   exit_time: "No Trade Zone",
+          //   exit_price: "No Trade Zone",
+          //   profit_loss: "No Trade Zone",
+          // });
+          continue;
+        }
+
+        if (entry.signal === "Buy") {
+          if (exit.signal === "Exit") {
+            results.push({
+              signal: "Buy",
+              entry_reason: entry.reason,
+              entry_time: formatToIST(entry.entryTime),
+              entry_price: entry.price,
+              exit_reason: exit.reason,
+              exit_time: formatToIST(exit.entryTime),
+              exit_price: exit.price,
+              profit_loss: (exit.price - entry.price).toFixed(2),
+            });
+          } else if (exit.signal === "Sell") {
+            results.push({
+              signal: "Buy",
+              entry_reason: entry.reason,
+              entry_time: formatToIST(entry.entryTime),
+              entry_price: entry.price,
+              exit_reason: exit.reason,
+              exit_time: formatToIST(exit.entryTime),
+              exit_price: exit.price,
+              profit_loss: (exit.price - entry.price).toFixed(2),
+            });
+          }
+        } else if (entry.signal === "Sell") {
+          if (exit.signal === "Exit") {
+            results.push({
+              signal: "Sell",
+              entry_reason: entry.reason,
+              entry_time: formatToIST(entry.entryTime),
+              entry_price: entry.price,
+              exit_reason: exit.reason,
+              exit_time: formatToIST(exit.entryTime),
+              exit_price: exit.price,
+              profit_loss: (entry.price - exit.price).toFixed(2),
+            });
+          } else if (exit.signal === "Buy") {
+            results.push({
+              signal: "Sell",
+              entry_reason: entry.reason,
+              entry_time: formatToIST(entry.entryTime),
+              entry_price: entry.price,
+              exit_reason: exit.reason,
+              exit_time: formatToIST(exit.entryTime),
+              exit_price: exit.price,
+              profit_loss: (entry.price - exit.price).toFixed(2),
+            });
+          }
         }
       }
 
-      // If the last trade is unpaired, add it as is
-      if (trades.length % 2 !== 0) {
-        const lastTrade = trades[trades.length - 1];
-        results.push({
-          signal: lastTrade.signal,
-          entry_reason: lastTrade.reason,
-          entry_time: formatToIST(lastTrade.entryTime),
-          entry_price: lastTrade.price,
-          exit_reason: "Pending",
-          exit_time: "Pending",
-          exit_price: "Pending",
-          profit_loss: "Pending",
-        });
-      }
+      // Handle last trade if it's an exit or pending trade
+      // const lastTrade = trades[trades.length - 1];
+      // if (lastTrade.signal === "Exit") {
+      // results.push({
+      //   signal: "Exit",
+      //   entry_reason: lastTrade.reason,
+      //   entry_time: formatToIST(lastTrade.entryTime),
+      //   entry_price: lastTrade.price,
+      //   exit_reason: "No Trade Zone",
+      //   exit_time: "No Trade Zone",
+      //   exit_price: "No Trade Zone",
+      //   profit_loss: "No Trade Zone",
+      // });
+      // } else if (trades.length % 2 !== 0) {
+      //   results.push({
+      //     signal: lastTrade.signal,
+      //     entry_reason: lastTrade.reason,
+      //     entry_time: formatToIST(lastTrade.entryTime),
+      //     entry_price: lastTrade.price,
+      //     exit_reason: "Pending",
+      //     exit_time: "Pending",
+      //     exit_price: "Pending",
+      //     profit_loss: "Pending",
+      //   });
+      // }
+
+      // if (trades.length % 2 !== 0) {
+      const lastTrade = trades[trades.length - 1];
+      results.push({
+        signal: lastTrade.signal,
+        entry_reason: lastTrade.reason,
+        entry_time: formatToIST(lastTrade.entryTime),
+        entry_price: lastTrade.price,
+        exit_reason: "",
+        exit_time: "",
+        exit_price: "",
+        profit_loss: "",
+      });
+      // }
 
       return results;
     }

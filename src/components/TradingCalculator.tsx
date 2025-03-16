@@ -65,7 +65,7 @@ export default function HomeComponent() {
       // if (response2.data) showSupertrendToast(response2.data);
       const response = await axios.patch(`${BASEURL}/api/trading/redirect`, {
         company: selectedCompany,
-        date: "12-03-2025",
+        date: "13-03-2025",
       });
     } catch (error: any) {
       toast.error(

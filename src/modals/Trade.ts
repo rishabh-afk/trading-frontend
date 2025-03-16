@@ -65,7 +65,7 @@ const TradeSchema = new Schema<ITrade>(
 // Pre-save hook to set entryTime and adjust exitTime
 TradeSchema.pre("save", function (next) {
   const createdAt = this.createdAt || new Date();
-  this.entryTime = new Date(createdAt);
+  this.entryTime = new Date(createdAt.getTime() + 3 * 60 * 1000);
   this.exitTime = new Date(createdAt.getTime() + 3 * 60 * 1000);
   next();
 });
@@ -97,7 +97,7 @@ TradeSchema.methods.generateSignal = function (bufferValue: any): {
   const { price, levels } = this;
   const { bc, tc, r1, r2, r3, r4, s1, s2, s3, s4 } = levels;
 
-  const BUFFER = bufferValue ?? 15;
+  const BUFFER = bufferValue;
   let signal = "No Action";
   let reason = "Price is in a neutral zone.";
 
@@ -113,7 +113,7 @@ TradeSchema.methods.generateSignal = function (bufferValue: any): {
   }
   // If price is between TC and BC, No Action
   else if (price < tc && price > bc) {
-    signal = "No Action";
+    signal = "Exit";
     reason = "Price is within CPR range.";
   }
 
@@ -131,6 +131,47 @@ TradeSchema.methods.generateSignal = function (bufferValue: any): {
 
   this.signal = signal;
   this.reason = reason;
+  return { signal, reason };
+};
+
+TradeSchema.methods.exitSignal = function (
+  currentSignal: string,
+  bufferValue: any,
+  open: any
+): {
+  signal: string;
+  reason: string;
+} {
+  const BUFFER = bufferValue;
+  const { price, levels } = this;
+  const { r1, r2, r3, r4, s1, s2, s3, s4 } = levels;
+
+  let signal = "No Action";
+  let reason = "No trend change detected.";
+
+  const levelsMap = { r1, r2, r3, r4, s1, s2, s3, s4 };
+
+  Object.entries(levelsMap).forEach(([levelName, level]) => {
+    if (currentSignal === "Buy" && open > level && price < level - BUFFER) {
+      signal = "Exit";
+      reason = `Price has crossed below the ${levelName} level (${level.toFixed(
+        2
+      )}) and moved further down by more than the buffer (${BUFFER.toFixed(
+        2
+      )}). Exiting Buy position.`;
+    } else if (
+      currentSignal === "Sell" &&
+      open < level &&
+      price > level + BUFFER
+    ) {
+      signal = "Exit";
+      reason = `Price has crossed above the ${levelName} level (${level.toFixed(
+        2
+      )}) and moved further up by more than the buffer (${BUFFER.toFixed(
+        2
+      )}). Exiting Sell position.`;
+    }
+  });
   return { signal, reason };
 };
 
