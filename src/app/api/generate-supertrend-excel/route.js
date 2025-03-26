@@ -28,10 +28,6 @@ export async function GET(request) {
 
     const supertrendData = await Supertrend.find({
       company: company,
-      createdAt: {
-        $gte: startOfDay,
-        $lte: endOfDay,
-      },
     });
 
     if (supertrendData.length === 0) {
@@ -49,22 +45,30 @@ export async function GET(request) {
     worksheet.addRow([
       "Company",
       "Trend",
-      "Upper Band",
-      "Lower Band",
-      "Current Price",
-      "Created At",
+      "date",
+      "High",
+      "Low",
+      "close",
+      "Open",
     ]).font = { bold: true };
+
+    const formatToIST = (date) => {
+      if (!date) return "N/A";
+      return new Date(date).toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata",
+      });
+    };
 
     supertrendData.forEach((data) => {
       worksheet.addRow([
         data.company,
         data.trend,
-        data.upperBand,
-        data.lowerBand,
-        data.currentPrice,
-        new Date(data.createdAt).toLocaleString("en-IN", {
-          timeZone: "Asia/Kolkata",
-        }),
+        formatToIST(data.date),
+        data.high,
+        data.high,
+        data.low,
+        data.open,
+        data.close,
       ]);
     });
 

@@ -59,14 +59,17 @@ export default function HomeComponent() {
       //   const lastPrice = ohlc[selectedCompany].last_price;
       //   await buy({ currentPrice: lastPrice }, selectedCompany);
       // } else toast.error("Selected company's data is unavailable.");
-      // const response2 = await axios.put(`${BASEURL}/api/trading/redirect`, {
-      //   company: selectedCompany,
-      // });
-      // if (response2.data) showSupertrendToast(response2.data);
-      const response = await axios.patch(`${BASEURL}/api/trading/redirect`, {
+      const response2 = await axios.put(`${BASEURL}/api/trading/redirect`, {
         company: selectedCompany,
-        date: "13-03-2025",
+        date: "2025-03-20",
+        prevdate: "2025-03-19",
       });
+      // console.log(first);
+      // if (response2.data) showSupertrendToast(response2.data);
+      // const response = await axios.patch(`${BASEURL}/api/trading/redirect`, {
+      //   company: selectedCompany,
+      //   date: "18-03-2025",
+      // });
     } catch (error: any) {
       toast.error(
         error?.response?.data?.message || "Error fetching market data."

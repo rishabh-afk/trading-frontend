@@ -9,9 +9,9 @@ const DownloadSupertrendExcel = ({
 }) => {
   const handleDownloadSupertrendExcel = async () => {
     try {
-      if (!selectedCompany) return toast.info("Please select a company!");
+      // if (!selectedCompany) return toast.info("Please select a company!");
       const response = await axios.get(
-        "/api/generate-supertrend-excel?company=" + selectedCompany,
+        "/api/generate-supertrend-excel?company=" + "BSE:SENSEX",
         { responseType: "blob" }
       );
 

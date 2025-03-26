@@ -41,21 +41,14 @@ async function getHistoricalDataFunc(
       );
     }
 
-    // Extract relevant OHLC data
-    const formattedData: HistoricalData[] = historicalData.map((data: any) => ({
-      low: data.low,
-      high: data.high,
-      close: data.close,
-    }));
-
-    return formattedData;
+    return historicalData;
   } catch (error) {
     console.error("Error fetching historical data:", error);
     return [];
   }
 }
 
-function calculateTrueRange(high: any, low: any, prevClose: any) {
+function calculateTrueRange(high: number, low: number, prevClose: number) {
   return Math.max(
     high - low,
     Math.abs(high - prevClose),
@@ -63,21 +56,26 @@ function calculateTrueRange(high: any, low: any, prevClose: any) {
   );
 }
 
-function calculateATR(data: any, period: any) {
-  let atrArray = [];
-  let trArray = [];
+function calculateATR(
+  data: { high: number; low: number; close: number }[],
+  period: number = 14
+): (number | null)[] {
+  let atrArray: (number | null)[] = new Array(period - 1).fill(null);
+  let trArray: number[] = [];
 
   for (let i = 0; i < data.length; i++) {
     let prevClose = i === 0 ? data[i].close : data[i - 1].close;
-    let tr = calculateTrueRange(data[i].high, data[i].low, prevClose);
+    let tr = Number(
+      calculateTrueRange(data[i].high, data[i].low, prevClose).toFixed(2)
+    );
     trArray.push(tr);
 
-    if (i < period) atrArray.push(null);
-    else {
+    if (i >= period - 1) {
       let atr =
-        trArray.slice(i - period, i).reduce((sum, val) => sum + val, 0) /
-        period;
-      atrArray.push(atr);
+        trArray
+          .slice(i - period + 1, i + 1)
+          .reduce((sum, val) => sum + val, 0) / period;
+      atrArray.push(Number(atr.toFixed(2)));
     }
   }
   return atrArray;
@@ -86,62 +84,44 @@ function calculateATR(data: any, period: any) {
 /**
  * Calculates the Supertrend indicator based on historical OHLC data.
  */
-function calculateSupertrend(
-  ohlcData: HistoricalData[],
-  period: number = 10,
-  multiplier: number = 3.5
-) {
-  if (ohlcData.length === 0) {
-    throw new Error("Insufficient historical data for Supertrend calculation.");
-  }
+function calculateSupertrend(data: any[], period = 14, multiplier = 3) {
+  let atrArray = calculateATR(data, period);
+  let supertrendData: any[] = new Array(data.length).fill(null);
 
-  let upperBand: number[] = [];
-  let lowerBand: number[] = [];
-  // let supertrend: ("bullish" | "bearish")[] = [];
+  let prevSupertrend = null;
+  let trend = "neutral"; // Default trend
 
-  // ATR is set to a constant value of 5
-  // const atr = 5;
-  let atrArray: any = calculateATR(ohlcData, period);
-  let supertrend: any = new Array(ohlcData.length).fill(null);
+  for (let i = 0; i < data.length; i++) {
+    if (atrArray[i] === null) continue; // Skip until ATR is available
 
-  console.log(atrArray);
+    let midPoint = (data[i].high + data[i].low) / 2;
+    let atr = atrArray[i] as number;
 
-  // Calculate Supertrend
-  for (let i = 0; i < ohlcData.length; i++) {
-    let atr = atrArray[i];
-    const hl2 = (ohlcData[i].high + ohlcData[i].low) / 2;
-    upperBand[i] = Number((hl2 + multiplier * atr).toFixed(2));
-    lowerBand[i] = Number((hl2 - multiplier * atr).toFixed(2));
+    let upperBand = Number((midPoint + multiplier * atr).toFixed(2));
+    let lowerBand = Number((midPoint - multiplier * atr).toFixed(2));
 
-    // if (i === period || supertrend[i - 1] === "bearish") {
-    //   supertrend[i] = ohlcData[i].close > lowerBand[i] ? "bullish" : "bearish";
-    // } else {
-    //   supertrend[i] = ohlcData[i].close < upperBand[i] ? "bearish" : "bullish";
-    // }
-    if (i === period) {
-      supertrend[i] =
-        ohlcData[i].close > upperBand[i] ? lowerBand[i] : upperBand[i];
-      supertrend[i] = ohlcData[i].close > upperBand[i] ? "bullish" : "bearish";
-    } else {
-      if (ohlcData[i].close > supertrend[i - 1]) {
-        supertrend[i] = lowerBand[i];
-        supertrend[i] = "bullish";
-      } else if (ohlcData[i].close < supertrend[i - 1]) {
-        supertrend[i] = upperBand[i];
-        supertrend[i] = "bearish";
-      } else {
-        supertrend[i] = supertrend[i - 1];
+    if (i === period - 1) {
+      trend = data[i].close > upperBand ? "bullish" : "bearish";
+      prevSupertrend = trend === "bullish" ? lowerBand : upperBand;
+    } else if (i > period - 1) {
+      if (data[i].close > prevSupertrend!) {
+        trend = "bullish";
+        prevSupertrend = lowerBand;
+      } else if (data[i].close < prevSupertrend!) {
+        trend = "bearish";
+        prevSupertrend = upperBand;
       }
     }
-  }
-  console.log(supertrend);
-  return {
-    trend: supertrend[ohlcData.length - 1],
-    upperBand: upperBand[ohlcData.length - 1],
-    lowerBand: lowerBand[ohlcData.length - 1],
-  };
-}
 
+    supertrendData[i] = {
+      value: prevSupertrend,
+      trend: trend,
+      ...data[i],
+    };
+  }
+
+  return supertrendData.slice(-1); // Return the latest Supertrend value
+}
 async function saveSupertrendData(
   companyName: string,
   supertrendResult: ReturnType<typeof calculateSupertrend>
@@ -437,7 +417,8 @@ export async function PATCH(req: Request) {
     const instrumentToken = ohlcData[company]?.instrument_token;
 
     // Convert to YYYY-MM-DD format
-    const [dayl, monthl, yearl] = date.split("-");
+    const daten = "14-03-2025";
+    const [dayl, monthl, yearl] = daten.split("-");
     const givenDate = new Date(`${yearl}-${monthl}-${dayl}`);
     givenDate.setDate(givenDate.getDate() - 1);
     const formattedDatel = givenDate.toISOString().split("T")[0];
@@ -471,8 +452,22 @@ export async function PATCH(req: Request) {
 
     // ohlc = ohlc.slice(5);
 
+    const formatToIST = (date: any) => {
+      if (!date) return "N/A";
+      return new Date(date).toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata",
+      });
+    };
+
     for (const candle of ohlc) {
-      const { open, close: closeAmount, date } = candle;
+      const {
+        open,
+        high: highAmount,
+        low: lowAmount,
+        close: closeAmount,
+        date,
+      } = candle;
+      // console.log(formatToIST(date), open, lowAmount, highAmount, closeAmount);
       const trade = new Trade({
         high,
         low,
@@ -484,11 +479,14 @@ export async function PATCH(req: Request) {
         price: closeAmount,
       });
       trade.calculateLevels();
+
       const { signal } = trade.generateSignal(bufferValue);
       const lastTrade = await Trade.findOne({ company }).sort({
         createdAt: -1,
       });
       if (lastTrade) {
+        // if (signal !== "No Action" && lastTrade.signal !== signal)
+        //   console.log(trade.levels, closeAmount, signal, formatToIST(date));
         const { signal: exitSignal, reason } = trade.exitSignal(
           lastTrade.signal,
           bufferValue,
@@ -548,10 +546,18 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
     await dbConnect();
     const body = await request.json();
     let {
+      date,
       company,
+      prevdate,
       period = 14,
       multiplier = 3,
-    }: { company: string; period?: number; multiplier?: number } = body;
+    }: {
+      date: any;
+      prevdate: any;
+      company: string;
+      period?: number;
+      multiplier?: number;
+    } = body;
 
     if (!company) {
       return NextResponse.json(
@@ -559,11 +565,6 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
         { status: 400 }
       );
     }
-
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(today.getDate() - 1);
-    const formattedYesterday = yesterday.toISOString().split("T")[0];
 
     const ohlc = await kite.getOHLC([company]);
     const instrumentToken = ohlc[company]?.instrument_token;
@@ -575,23 +576,11 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Get the start date (based on 14 candles)
-    const startDate = new Date();
-    startDate.setMinutes(startDate.getMinutes() - period * 3);
-    const formattedStartDate = startDate.toISOString().split("T")[0];
-
     let historicalData: any = await getHistoricalDataFunc(
       instrumentToken,
-      formattedYesterday,
-      formattedStartDate
+      date,
+      date
     );
-
-    if (!historicalData || historicalData.length < 13) {
-      return NextResponse.json(
-        { error: "Insufficient historical data for Supertrend calculation." },
-        { status: 400 }
-      );
-    }
 
     if (!historicalData) {
       return NextResponse.json(
@@ -600,29 +589,52 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    historicalData = historicalData.slice(-14);
+    // Function to fetch previous day's data
+    const fetchPreviousDayData = async (attemptDate: any) => {
+      return await getHistoricalDataFunc(
+        instrumentToken,
+        attemptDate,
+        attemptDate
+      );
+    };
 
-    const supertrend: any = calculateSupertrend(
-      historicalData,
-      period,
-      multiplier
-    );
+    for (let i = 0; i < historicalData.length; i++) {
+      let fetchedData: any[] = [];
 
-    await saveSupertrendData(company, {
-      ...supertrend,
-      currentPrice: ohlc[company]?.last_price,
-    });
+      if (i < period) {
+        let prevData = (await fetchPreviousDayData(prevdate)) ?? [];
+        let currentData = historicalData.slice(0, i);
 
-    return NextResponse.json(
-      {
-        high: historicalData.high,
-        low: historicalData.low,
-        close: historicalData.close,
-        currentPrice: ohlc[company]?.last_price,
-        supertrend,
-      },
-      { status: 200 }
-    );
+        const remainingNeeded = period - currentData.length;
+        if (remainingNeeded > 0 && prevData.length > 0) {
+          prevData = prevData.slice(-remainingNeeded);
+        }
+
+        if (prevData.length === 0) break; // Ensure we have enough data
+
+        fetchedData = [...prevData, ...currentData];
+      } else {
+        fetchedData = historicalData.slice(i - period, i);
+      }
+
+      // process my data
+      const supertrend: any = calculateSupertrend(
+        [...fetchedData, ...fetchedData],
+        period,
+        multiplier
+      );
+      if (supertrend && supertrend.length > 0) {
+        const lastTrade = await Supertrend.findOne({ company }).sort({
+          createdAt: -1,
+        });
+        if (!lastTrade || lastTrade?.trend !== supertrend[0]?.trend)
+          await saveSupertrendData(company, {
+            ...supertrend[0],
+            currentPrice: supertrend[0]?.close,
+          });
+      }
+    }
+    return NextResponse.json({ message: "success" }, { status: 200 });
   } catch (error: any) {
     console.error("Error in Supertrend API:", error.message);
     return NextResponse.json(
