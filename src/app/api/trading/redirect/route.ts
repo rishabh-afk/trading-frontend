@@ -1,9 +1,9 @@
+import Trade from "@/modals/Trade";
 import { KiteConnect } from "kiteconnect";
 import { dbConnect } from "@/lib/mongodb";
 import Supertrend from "@/modals/Supertrend";
 import CompanyLevels from "@/modals/CompanyLevel";
 import { NextRequest, NextResponse } from "next/server";
-import Trade from "@/modals/Trade";
 
 interface HistoricalData {
   high: number;
@@ -531,9 +531,6 @@ export async function PATCH(req: Request) {
   }
 }
 
-/**
- * PUT request handler for calculating the Supertrend indicator.
- */
 export async function PUT(request: NextRequest): Promise<NextResponse> {
   try {
     if (!accessToken) {
@@ -545,95 +542,126 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
 
     await dbConnect();
     const body = await request.json();
-    let {
-      date,
-      company,
-      prevdate,
-      period = 14,
-      multiplier = 3,
-    }: {
-      date: any;
-      prevdate: any;
-      company: string;
-      period?: number;
-      multiplier?: number;
-    } = body;
+    // let {
+    //   date,
+    //   company,
+    //   prevdate,
+    //   period = 5,
+    //   multiplier = 3,
+    // }: {
+    //   date: any;
+    //   prevdate: any;
+    //   company: string;
+    //   period?: number;
+    //   multiplier?: number;
+    // } = body;
 
-    if (!company) {
-      return NextResponse.json(
-        { error: "Company name is required." },
-        { status: 400 }
-      );
-    }
+    // if (!company) {
+    //   return NextResponse.json(
+    //     { error: "Company name is required." },
+    //     { status: 400 }
+    //   );
+    // }
 
-    const ohlc = await kite.getOHLC([company]);
-    const instrumentToken = ohlc[company]?.instrument_token;
+    // const ohlc = await kite.getOHLC([company]);
+    // const instrumentToken = ohlc[company]?.instrument_token;
 
-    if (!instrumentToken) {
-      return NextResponse.json(
-        { error: "Instrument token not found for the company." },
-        { status: 404 }
-      );
-    }
+    // if (!instrumentToken) {
+    //   return NextResponse.json(
+    //     { error: "Instrument token not found for the company." },
+    //     { status: 404 }
+    //   );
+    // }
 
-    let historicalData: any = await getHistoricalDataFunc(
-      instrumentToken,
-      date,
-      date
-    );
+    // let historicalData: any = await getHistoricalDataFunc(
+    //   instrumentToken,
+    //   date,
+    //   date
+    // );
 
-    if (!historicalData) {
-      return NextResponse.json(
-        { error: "Historical data not available." },
-        { status: 404 }
-      );
-    }
+    // if (!historicalData) {
+    //   return NextResponse.json(
+    //     { error: "Historical data not available." },
+    //     { status: 404 }
+    //   );
+    // }
 
-    // Function to fetch previous day's data
-    const fetchPreviousDayData = async (attemptDate: any) => {
-      return await getHistoricalDataFunc(
-        instrumentToken,
-        attemptDate,
-        attemptDate
-      );
+    const orderData = {
+      price: 1,
+      quantity: 10,
+      product: "MIS",
+      exchange: "BSE",
+      validity: "DAY",
+      order_type: "MARKET",
+      trigger_price: 1615,
+      tradingsymbol: "INFY",
+      transaction_type: "BUY",
     };
 
-    for (let i = 0; i < historicalData.length; i++) {
-      let fetchedData: any[] = [];
+    const orderParams: any = {
+      exchange: "NSE",
+      price: orderData.price || 0,
+      product: orderData.product,
+      quantity: orderData.quantity,
+      order_type: orderData.order_type,
+      validity: orderData.validity || "DAY",
+      tradingsymbol: orderData.tradingsymbol,
+      trigger_price: orderData.trigger_price || 0,
+      transaction_type: orderData.transaction_type,
+      amo: true,
+    };
 
-      if (i < period) {
-        let prevData = (await fetchPreviousDayData(prevdate)) ?? [];
-        let currentData = historicalData.slice(0, i);
+    const orderResponse = await kite.placeOrder("regular", {
+      ...orderParams,
+      amo: true,
+    });
+    console.log(orderResponse);
 
-        const remainingNeeded = period - currentData.length;
-        if (remainingNeeded > 0 && prevData.length > 0) {
-          prevData = prevData.slice(-remainingNeeded);
-        }
+    // Function to fetch previous day's data
+    // const fetchPreviousDayData = async (attemptDate: any) => {
+    //   return await getHistoricalDataFunc(
+    //     instrumentToken,
+    //     attemptDate,
+    //     attemptDate
+    //   );
+    // };
 
-        if (prevData.length === 0) break; // Ensure we have enough data
+    // for (let i = 0; i < historicalData.length; i++) {
+    //   let fetchedData: any[] = [];
 
-        fetchedData = [...prevData, ...currentData];
-      } else {
-        fetchedData = historicalData.slice(i - period, i);
-      }
+    //   if (i < period) {
+    //     let prevData = (await fetchPreviousDayData(prevdate)) ?? [];
+    //     let currentData = historicalData.slice(0, i);
 
-      // process my data
-      const supertrend: any = calculateSupertrend(
-        [...fetchedData, ...fetchedData],
-        period,
-        multiplier
-      );
-      if (supertrend && supertrend.length > 0) {
-        const lastTrade = await Supertrend.findOne({ company }).sort({
-          createdAt: -1,
-        });
-        if (!lastTrade || lastTrade?.trend !== supertrend[0]?.trend)
-          await saveSupertrendData(company, {
-            ...supertrend[0],
-            currentPrice: supertrend[0]?.close,
-          });
-      }
-    }
+    //     const remainingNeeded = period - currentData.length;
+    //     if (remainingNeeded > 0 && prevData.length > 0) {
+    //       prevData = prevData.slice(-remainingNeeded);
+    //     }
+
+    //     if (prevData.length === 0) break; // Ensure we have enough data
+
+    //     fetchedData = [...prevData, ...currentData];
+    //   } else {
+    //     fetchedData = historicalData.slice(i - period, i);
+    //   }
+
+    //   // process my data
+    //   const supertrend: any = calculateSupertrend(
+    //     [...fetchedData, ...fetchedData],
+    //     period,
+    //     multiplier
+    //   );
+    //   if (supertrend && supertrend.length > 0) {
+    //     const lastTrade = await Supertrend.findOne({ company }).sort({
+    //       createdAt: -1,
+    //     });
+    //     if (!lastTrade || lastTrade?.trend !== supertrend[0]?.trend)
+    //       await saveSupertrendData(company, {
+    //         ...supertrend[0],
+    //         currentPrice: supertrend[0]?.close,
+    //       });
+    //   }
+    // }
     return NextResponse.json({ message: "success" }, { status: 200 });
   } catch (error: any) {
     console.error("Error in Supertrend API:", error.message);
